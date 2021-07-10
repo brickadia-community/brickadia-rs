@@ -1,0 +1,409 @@
+use std::{cmp, collections::HashMap, convert::TryFrom, io::{self, Cursor, Read, Seek, SeekFrom}};
+
+use bitstream_io::{BigEndian, BitRead, BitReader};
+use byteorder::{LittleEndian, ReadBytesExt};
+use flate2::read::ZlibDecoder;
+use thiserror::Error;
+
+use crate::{MAGIC_BYTES, ext::read::*, save::*};
+
+lazy_static::lazy_static! {
+    static ref DEFAULT_MATERIALS: Vec<String> = vec!["BMC_Hologram", "BMC_Plastic", "BMC_Glow", "BMC_Metallic", "BMC_Glass"].into_iter().map(|s| s.into()).collect();
+}
+
+#[derive(Error, Debug)]
+pub enum ReadError {
+    #[error("generic io error")]
+    IoError(#[from] io::Error),
+    #[error("bad magic bytes (expected 'BRS')")]
+    BadHeader,
+    #[error("invalid data in header 1")]
+    InvalidDataHeader1,
+    #[error("invalid data in header 2")]
+    InvalidDataHeader2,
+    #[error("must read in sequence: header 1, header 2, [preview], bricks")]
+    BadSectionReadOrder,
+}
+
+pub struct SaveReader<R: Read + Seek> {
+    reader: R,
+    pub version: u16,
+    pub game_version: i32,
+
+    header1_read: bool,
+    header2_read: bool,
+    preview_read: bool,
+}
+
+impl<R: Read + Seek> SaveReader<R> {
+    pub fn new(mut reader: R) -> Result<Self, ReadError> {
+        let mut magic = [0u8; 3];
+        reader.read_exact(&mut magic)?;
+        if magic != MAGIC_BYTES {
+            return Err(ReadError::BadHeader);
+        }
+
+        let version = reader.read_u16::<LittleEndian>()?;
+        let game_version = if version >= 8 { reader.read_i32::<LittleEndian>()? } else { 0 };
+
+        Ok(SaveReader { version, game_version, reader, header1_read: false, header2_read: false, preview_read: version < 8 })
+    }
+
+    pub fn read_header1(&mut self) -> Result<Header1, ReadError> {
+        let (mut cursor, _) = read_compressed(&mut self.reader)?;
+
+        // match map: a string
+        let map = cursor.read_string()?;
+
+        // match author name: a string
+        let author_name = cursor.read_string()?;
+
+        // match description: a string
+        let description = cursor.read_string()?;
+        
+        // match author id: a uuid
+        let author_uuid = cursor.read_uuid()?;
+
+        // match host:
+        // version >= 8: match a user (string followed by uuid)
+        //         else: not provided
+        let host = match self.version {
+            _ if self.version >= 8 => {
+                let name = cursor.read_string()?;
+                let id = cursor.read_uuid()?;
+                Some(User { name, id })
+            }
+            _ => None
+        };
+
+        // match save time:
+        // version >= 4: match 8 bytes
+        //         else: not provided
+        let save_time = match self.version {
+            _ if self.version >= 4 => {
+                let mut bytes = [0u8; 8]; // todo: figure out how to parse this
+                cursor.read_exact(&mut bytes)?;
+                Some(bytes)
+            }
+            _ => None
+        };
+
+        // match brick count: an i32
+        let brick_count = match cursor.read_i32::<LittleEndian>()? {
+            count if count >= 0 => count,
+            _ => return Err(ReadError::InvalidDataHeader1)
+        } as u32;
+
+        self.header1_read = true;
+        Ok(Header1 {
+            map,
+            author: User { name: author_name, id: author_uuid },
+            description,
+            host,
+            save_time: save_time.unwrap_or([0u8; 8]),
+            brick_count,
+        })
+    }
+
+    pub fn read_header2(&mut self) -> Result<Header2, ReadError> {
+        if !self.header1_read {
+            return Err(ReadError::BadSectionReadOrder);
+        }
+
+        let (mut cursor, _) = read_compressed(&mut self.reader)?;
+
+        // match mods: an array of strings
+        let mods = cursor.read_array(|r| r.read_string())?;
+        
+        // match brick assets: an array of strings
+        let brick_assets = cursor.read_array(|r| r.read_string())?;
+
+        // match colors: an array of 4 bytes each, BGRA
+        let colors = cursor.read_array(|r| -> io::Result<Color> {
+            let mut bytes = [0u8; 4];
+            r.read_exact(&mut bytes)?;
+            Ok(Color::from_bytes_bgra(bytes))
+        })?;
+
+        // match materials:
+        // version >= 2: an array of strings
+        //         else: a list of default materials (see top of file)
+        let materials = match self.version {
+            _ if self.version >= 2 => cursor.read_array(|r| r.read_string())?,
+            _ => DEFAULT_MATERIALS.clone()
+        };
+
+        // match brick owners:
+        // version >= 3: match brick owner:
+        //               version >= 8: a user (string followed by uuid), then an i32 for brick count
+        //                       else: a user (string followed by uuid)
+        let brick_owners = match self.version {
+            _ if self.version >= 3 => cursor.read_array(|r| -> io::Result<BrickOwner> {
+                match self.version {
+                    _ if self.version >= 8 => {
+                        let id = r.read_uuid()?;
+                        let name = r.read_string()?;
+                        let bricks = r.read_i32::<LittleEndian>()?;
+                        if bricks < 0 { return Err(io::Error::new(io::ErrorKind::InvalidData, "")); }
+                        Ok(BrickOwner { name, id, bricks: Some(bricks as u32) })
+                    }
+                    _ => {
+                        let id = r.read_uuid()?;
+                        let name = r.read_string()?;
+                        Ok(BrickOwner::from(User { id, name }))
+                    }
+                }
+            })?,
+            _ => vec![],
+        };
+
+        // match physical materials
+        // version >= 9: an array of strings
+        //         else: not provided
+        let physical_materials = match self.version {
+            _ if self.version >= 9 => cursor.read_array(|r| r.read_string())?,
+            _ => vec![]
+        };
+
+        self.header2_read = true;
+        Ok(Header2 {
+            mods,
+            brick_assets,
+            colors,
+            materials,
+            brick_owners,
+            physical_materials
+        })
+    }
+
+    pub fn read_preview(&mut self) -> Result<Option<Vec<u8>>, ReadError> {
+        if !self.header2_read {
+            return Err(ReadError::BadSectionReadOrder);
+        }
+
+        if self.version < 8 {
+            return Ok(None);
+        }
+
+        if self.reader.read_u8()? != 0 {
+            let len = self.reader.read_i32::<LittleEndian>()?;
+            let mut vec = vec![0u8; len as usize];
+            self.reader.read_exact(&mut vec)?;
+            self.preview_read = true;
+            Ok(Some(vec))
+        } else {
+            self.preview_read = true;
+            Ok(None)
+        }
+    }
+
+    pub fn skip_preview(&mut self) -> Result<(), ReadError> {
+        if !self.header2_read {
+            return Err(ReadError::BadSectionReadOrder);
+        }
+
+        if self.version < 8 {
+            return Ok(());
+        }
+
+        if self.reader.read_u8()? != 0 {
+            let len = self.reader.read_i32::<LittleEndian>()?;
+            self.reader.seek(SeekFrom::Current(len as i64))?;
+        }
+        
+        self.preview_read = true;
+        Ok(())
+    }
+
+    pub fn read_bricks(&mut self, header1: &Header1, header2: &Header2) -> Result<(Vec<Brick>, HashMap<String, Component>), ReadError> {
+        if !self.preview_read || !self.header2_read {
+            return Err(ReadError::BadSectionReadOrder);
+        }
+
+        let (cursor, len) = read_compressed(&mut self.reader)?;
+        let mut bits = BitReader::<_, BigEndian>::new(cursor);
+
+        let brick_count = header1.brick_count as usize;
+        let brick_asset_count = header2.brick_assets.len();
+        let material_count = header2.materials.len();
+        let physical_material_count = header2.physical_materials.len();
+
+        let mut bricks = vec![];
+        let mut components = HashMap::new();
+        
+        // loop over each brick
+        loop {
+            // align and break out of the loop if we've seeked far enough ahead
+            bits.byte_align();
+            if bricks.len() >= brick_count || bits.reader().unwrap().position() >= len as u64 { break; }
+
+            let asset_name_index = bits.read_uint(cmp::max(2, brick_asset_count as u32))?;
+
+            let size = match bits.read_bit()? {
+                true => Size::Procedural(bits.read_uint_packed()?, bits.read_uint_packed()?, bits.read_uint_packed()?),
+                false => Size::Empty
+            };
+
+            let position = (bits.read_int_packed()?, bits.read_int_packed()?, bits.read_int_packed()?);
+
+            let orientation = bits.read_uint(24)?;
+            let direction = Direction::try_from(((orientation >> 2) % 6) as u8).unwrap();
+            let rotation = Rotation::try_from((orientation & 3) as u8).unwrap();
+
+            let collision = match self.version {
+                _ if self.version >= 10 => Collision { player: bits.read_bit()?, weapon: bits.read_bit()?, interaction: bits.read_bit()?, tool: bits.read_bit()? },
+                _ => Collision::for_all(bits.read_bit()?),
+            };
+
+            let visibility = bits.read_bit()?;
+
+            let material_index = match self.version {
+                _ if self.version >= 8 => bits.read_uint(material_count as u32)?,
+                _ => if bits.read_bit()? { bits.read_uint_packed()? } else { 1 },
+            };
+
+            let physical_index = match self.version {
+                _ if self.version >= 9 => bits.read_uint(physical_material_count as u32)?,
+                _ => 0
+            };
+
+            let material_intensity = match self.version {
+                _ if self.version >= 9 => bits.read_uint(11)?,
+                _ => 5
+            };
+
+            let color = match bits.read_bit()? {
+                true => match self.version {
+                    _ if self.version >= 9 => {
+                        let mut bytes = [0u8; 3];
+                        bits.read_bytes(&mut bytes)?;
+                        BrickColor::Unique(Color::from_bytes_rgb(bytes))
+                    }
+                    _ => {
+                        let mut bytes = [0u8; 4];
+                        bits.read_bytes(&mut bytes)?;
+                        BrickColor::Unique(Color::from_bytes_bgra(bytes))
+                    }
+                }
+                false => BrickColor::Index(bits.read_uint(header2.colors.len() as u32)?)
+            };
+
+            let owner_index = if self.version >= 3 { bits.read_uint_packed()? } else { 0 };
+
+            let brick = Brick {
+                asset_name_index,
+                size,
+                position,
+                direction,
+                rotation,
+                collision,
+                visibility,
+                material_index,
+                physical_index,
+                material_intensity,
+                color,
+                owner_index,
+                components: HashMap::new(),
+            };
+
+            println!("{:?}", brick);
+
+            bricks.push(brick);
+        }
+
+        // components
+        if self.version >= 8 {
+            let (mut cursor, _) = read_compressed(&mut self.reader)?;
+            let len = cursor.read_i32::<LittleEndian>()?;
+
+            for _ in 0..len {
+                let name = cursor.read_string()?;
+
+                let mut bit_bytes = vec![0u8; cursor.read_i32::<LittleEndian>()? as usize];
+                cursor.read_exact(&mut bit_bytes)?;
+                let mut bits = BitReader::<_, BigEndian>::new(Cursor::new(bit_bytes));
+
+                let version = bits.read_i32_le()?;
+                let brick_indices = bits.read_array(|r| r.read_uint(brick_count as u32))?;
+                
+                let mut properties = HashMap::new();
+                for _ in 0..bits.read_i32_le()? {
+                    properties.insert(bits.read_string()?, bits.read_string()?);
+                }
+
+                // components for each brick
+                for &i in brick_indices.iter() {
+                    let mut props = HashMap::new();
+                    for (key, val) in properties.iter() {
+                        props.insert(key.clone(), bits.read_unreal_type(&val[..])?);
+                    }
+                    bricks[i as usize].components.insert(name.clone(), props);
+                }
+
+                components.insert(name, Component {
+                    version,
+                    brick_indices,
+                    properties,
+                });
+            }
+        }
+
+        Ok((bricks, components))
+    }
+
+    pub fn read_all(&mut self) -> Result<SaveData, ReadError> {
+        let header1 = self.read_header1()?;
+        let header2 = self.read_header2()?;
+        let preview = self.read_preview()?;
+        let (bricks, components) = self.read_bricks(&header1, &header2)?;
+
+        Ok(SaveData {
+            version: self.version,
+            game_version: self.game_version,
+            header1,
+            header2,
+            preview,
+            bricks,
+            components,
+        })
+    }
+
+    pub fn read_all_skip_preview(&mut self) -> Result<SaveData, ReadError> {
+        let header1 = self.read_header1()?;
+        let header2 = self.read_header2()?;
+        self.skip_preview()?;
+        let (bricks, components) = self.read_bricks(&header1, &header2)?;
+
+        Ok(SaveData {
+            version: self.version,
+            game_version: self.game_version,
+            header1,
+            header2,
+            preview: None,
+            bricks,
+            components,
+        })
+    }
+}
+
+fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), ReadError> {
+    let (uncompressed_size, compressed_size) = (reader.read_i32::<LittleEndian>()?, reader.read_i32::<LittleEndian>()?);
+    if uncompressed_size < 0 || compressed_size < 0 || compressed_size >= uncompressed_size {
+        return Err(ReadError::InvalidDataHeader1);
+    }
+
+    if compressed_size == 0 {
+        // no need to decompress first
+        let mut bytes = vec![0u8; uncompressed_size as usize];
+        reader.read_exact(&mut bytes)?;
+        Ok((Cursor::new(bytes), uncompressed_size))
+    } else {
+        // decompress first, then read
+        let mut compressed = vec![0u8; compressed_size as usize];
+        reader.read_exact(&mut compressed)?;
+        let mut decoder = ZlibDecoder::new(&compressed[..]);
+        let mut bytes = vec![0u8; uncompressed_size as usize];
+        decoder.read_exact(&mut bytes)?;
+        Ok((Cursor::new(bytes), uncompressed_size))
+    }
+}
