@@ -94,8 +94,8 @@ pub struct Header2 {
 
     /// A list of brick owners.
     pub brick_owners: Vec<BrickOwner>,
-    
-    /// A list of physical materials. Empty if save version is 
+
+    /// A list of physical materials. Empty if save version is
     pub physical_materials: Vec<String>,
 }
 
@@ -128,12 +128,15 @@ pub struct User {
     pub name: String,
 
     /// The user's ID, a UUID.
-    pub id: Uuid
+    pub id: Uuid,
 }
 
 impl Default for User {
     fn default() -> Self {
-        User { name: "Unknown".into(), id: Uuid::default() }
+        User {
+            name: "Unknown".into(),
+            id: Uuid::default(),
+        }
     }
 }
 
@@ -148,13 +151,21 @@ pub struct BrickOwner {
 
 impl From<User> for BrickOwner {
     fn from(user: User) -> Self {
-        BrickOwner { name: user.name, id: user.id, bricks: 0 }
+        BrickOwner {
+            name: user.name,
+            id: user.id,
+            bricks: 0,
+        }
     }
 }
 
 impl BrickOwner {
     pub fn from_user_bricks(user: User, bricks: u32) -> Self {
-        BrickOwner {name: user.name, id: user.id, bricks: bricks }
+        BrickOwner {
+            name: user.name,
+            id: user.id,
+            bricks: bricks,
+        }
     }
 }
 
@@ -164,18 +175,28 @@ pub struct Color {
     pub r: u8,
     pub g: u8,
     pub b: u8,
-    pub a: u8
+    pub a: u8,
 }
 
 impl Color {
     /// Converts a slice of 4 bytes (bgra) to a Color (rgba).
     pub fn from_bytes_bgra(slice: [u8; 4]) -> Self {
-        Color { r: slice[2], g: slice[1], b: slice[0], a: slice[3] }
+        Color {
+            r: slice[2],
+            g: slice[1],
+            b: slice[0],
+            a: slice[3],
+        }
     }
 
     /// Converts a slice of 3 bytes (rgb) to a Color (rgba), assuming a = 255.
     pub fn from_bytes_rgb(slice: [u8; 3]) -> Self {
-        Color { r: slice[0], g: slice[1], b: slice[2], a: 255 }
+        Color {
+            r: slice[0],
+            g: slice[1],
+            b: slice[2],
+            a: 255,
+        }
     }
 }
 
@@ -219,7 +240,7 @@ pub struct Brick {
     pub owner_index: u32,
 
     /// The components on this brick.
-    pub components: HashMap<String, HashMap<String, UnrealType>>
+    pub components: HashMap<String, HashMap<String, UnrealType>>,
 }
 
 impl Default for Brick {
@@ -261,7 +282,7 @@ pub enum Rotation {
     Deg0,
     Deg90,
     Deg180,
-    Deg270
+    Deg270,
 }
 
 /// Represents a storable brick size.
@@ -295,7 +316,12 @@ pub struct Collision {
 
 impl Collision {
     pub fn for_all(state: bool) -> Self {
-        Collision { player: state, weapon: state, interaction: state, tool: state }
+        Collision {
+            player: state,
+            weapon: state,
+            interaction: state,
+            tool: state,
+        }
     }
 }
 

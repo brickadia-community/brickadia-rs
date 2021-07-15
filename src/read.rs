@@ -1,11 +1,16 @@
-use std::{cmp, collections::HashMap, convert::TryFrom, io::{self, Cursor, Read, Seek, SeekFrom}};
+use std::{
+    cmp,
+    collections::HashMap,
+    convert::TryFrom,
+    io::{self, Cursor, Read, Seek, SeekFrom},
+};
 
-use bitstream_io::{BigEndian, BitRead, BitReader};
+use bitstream_io::{BitRead, BitReader};
 use byteorder::{LittleEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
 use thiserror::Error;
 
-use crate::{MAGIC_BYTES, ext::read::*, save::*};
+use crate::{ext::read::*, save::*, MAGIC_BYTES};
 
 lazy_static::lazy_static! {
     static ref DEFAULT_MATERIALS: Vec<String> = vec!["BMC_Hologram", "BMC_Plastic", "BMC_Glow", "BMC_Metallic", "BMC_Glass"].into_iter().map(|s| s.into()).collect();
@@ -46,9 +51,20 @@ impl<R: Read + Seek> SaveReader<R> {
         }
 
         let version = reader.read_u16::<LittleEndian>()?;
-        let game_version = if version >= 8 { reader.read_i32::<LittleEndian>()? } else { 0 };
+        let game_version = if version >= 8 {
+            reader.read_i32::<LittleEndian>()?
+        } else {
+            0
+        };
 
-        Ok(SaveReader { version, game_version, reader, header1_read: false, header2_read: false, preview_read: version < 8 })
+        Ok(SaveReader {
+            version,
+            game_version,
+            reader,
+            header1_read: false,
+            header2_read: false,
+            preview_read: version < 8,
+        })
     }
 
     pub fn read_header1(&mut self) -> Result<Header1, ReadError> {
@@ -62,7 +78,7 @@ impl<R: Read + Seek> SaveReader<R> {
 
         // match description: a string
         let description = cursor.read_string()?;
-        
+
         // match author id: a uuid
         let author_uuid = cursor.read_uuid()?;
 
@@ -75,7 +91,7 @@ impl<R: Read + Seek> SaveReader<R> {
                 let id = cursor.read_uuid()?;
                 Some(User { name, id })
             }
-            _ => None
+            _ => None,
         };
 
         // match save time:
@@ -87,19 +103,22 @@ impl<R: Read + Seek> SaveReader<R> {
                 cursor.read_exact(&mut bytes)?;
                 Some(bytes)
             }
-            _ => None
+            _ => None,
         };
 
         // match brick count: an i32
         let brick_count = match cursor.read_i32::<LittleEndian>()? {
             count if count >= 0 => count,
-            _ => return Err(ReadError::InvalidDataHeader1)
+            _ => return Err(ReadError::InvalidDataHeader1),
         } as u32;
 
         self.header1_read = true;
         Ok(Header1 {
             map,
-            author: User { name: author_name, id: author_uuid },
+            author: User {
+                name: author_name,
+                id: author_uuid,
+            },
             description,
             host,
             save_time: save_time.unwrap_or([0u8; 8]),
@@ -116,7 +135,7 @@ impl<R: Read + Seek> SaveReader<R> {
 
         // match mods: an array of strings
         let mods = cursor.read_array(|r| r.read_string())?;
-        
+
         // match brick assets: an array of strings
         let brick_assets = cursor.read_array(|r| r.read_string())?;
 
@@ -132,7 +151,7 @@ impl<R: Read + Seek> SaveReader<R> {
         //         else: a list of default materials (see top of file)
         let materials = match self.version {
             _ if self.version >= 2 => cursor.read_array(|r| r.read_string())?,
-            _ => DEFAULT_MATERIALS.clone()
+            _ => DEFAULT_MATERIALS.clone(),
         };
 
         // match brick owners:
@@ -163,7 +182,7 @@ impl<R: Read + Seek> SaveReader<R> {
         //         else: not provided
         let physical_materials = match self.version {
             _ if self.version >= 9 => cursor.read_array(|r| r.read_string())?,
-            _ => vec![]
+            _ => vec![],
         };
 
         self.header2_read = true;
@@ -173,7 +192,7 @@ impl<R: Read + Seek> SaveReader<R> {
             colors,
             materials,
             brick_owners,
-            physical_materials
+            physical_materials,
         })
     }
 
@@ -211,12 +230,16 @@ impl<R: Read + Seek> SaveReader<R> {
             let len = self.reader.read_i32::<LittleEndian>()?;
             self.reader.seek(SeekFrom::Current(len as i64))?;
         }
-        
+
         self.preview_read = true;
         Ok(())
     }
 
-    pub fn read_bricks(&mut self, header1: &Header1, header2: &Header2) -> Result<(Vec<Brick>, HashMap<String, Component>), ReadError> {
+    pub fn read_bricks(
+        &mut self,
+        header1: &Header1,
+        header2: &Header2,
+    ) -> Result<(Vec<Brick>, HashMap<String, Component>), ReadError> {
         if !self.preview_read || !self.header2_read {
             return Err(ReadError::BadSectionReadOrder);
         }
@@ -231,28 +254,43 @@ impl<R: Read + Seek> SaveReader<R> {
 
         let mut bricks = vec![];
         let mut components = HashMap::new();
-        
+
         // loop over each brick
         loop {
             // align and break out of the loop if we've seeked far enough ahead
             bits.byte_align();
-            if bricks.len() >= brick_count || bits.reader().unwrap().position() >= len as u64 { break; }
+            if bricks.len() >= brick_count || bits.reader().unwrap().position() >= len as u64 {
+                break;
+            }
 
             let asset_name_index = bits.read_uint(brick_asset_count as u32)?;
 
             let size = match bits.read_bit()? {
-                true => Size::Procedural(bits.read_uint_packed()?, bits.read_uint_packed()?, bits.read_uint_packed()?),
-                false => Size::Empty
+                true => Size::Procedural(
+                    bits.read_uint_packed()?,
+                    bits.read_uint_packed()?,
+                    bits.read_uint_packed()?,
+                ),
+                false => Size::Empty,
             };
 
-            let position = (bits.read_int_packed()?, bits.read_int_packed()?, bits.read_int_packed()?);
+            let position = (
+                bits.read_int_packed()?,
+                bits.read_int_packed()?,
+                bits.read_int_packed()?,
+            );
 
             let orientation = bits.read_uint(24)?;
             let direction = Direction::try_from(((orientation >> 2) % 6) as u8).unwrap();
             let rotation = Rotation::try_from((orientation & 3) as u8).unwrap();
 
             let collision = match self.version {
-                _ if self.version >= 10 => Collision { player: bits.read_bit()?, weapon: bits.read_bit()?, interaction: bits.read_bit()?, tool: bits.read_bit()? },
+                _ if self.version >= 10 => Collision {
+                    player: bits.read_bit()?,
+                    weapon: bits.read_bit()?,
+                    interaction: bits.read_bit()?,
+                    tool: bits.read_bit()?,
+                },
                 _ => Collision::for_all(bits.read_bit()?),
             };
 
@@ -260,7 +298,13 @@ impl<R: Read + Seek> SaveReader<R> {
 
             let material_index = match self.version {
                 _ if self.version >= 8 => bits.read_uint(material_count as u32)?,
-                _ => if bits.read_bit()? { bits.read_uint_packed()? } else { 1 },
+                _ => {
+                    if bits.read_bit()? {
+                        bits.read_uint_packed()?
+                    } else {
+                        1
+                    }
+                }
             };
 
             let physical_index = match self.version {
@@ -285,11 +329,15 @@ impl<R: Read + Seek> SaveReader<R> {
                         bits.read_bytes(&mut bytes)?;
                         BrickColor::Unique(Color::from_bytes_bgra(bytes))
                     }
-                }
-                false => BrickColor::Index(bits.read_uint(header2.colors.len() as u32)?)
+                },
+                false => BrickColor::Index(bits.read_uint(header2.colors.len() as u32)?),
             };
 
-            let owner_index = if self.version >= 3 { bits.read_uint_packed()? } else { 0 };
+            let owner_index = if self.version >= 3 {
+                bits.read_uint_packed()?
+            } else {
+                0
+            };
 
             let brick = Brick {
                 asset_name_index,
@@ -320,11 +368,12 @@ impl<R: Read + Seek> SaveReader<R> {
 
                 let mut bit_bytes = vec![0u8; cursor.read_i32::<LittleEndian>()? as usize];
                 cursor.read_exact(&mut bit_bytes)?;
-                let mut bits = BitReader::<_, bitstream_io::LittleEndian>::new(Cursor::new(bit_bytes));
+                let mut bits =
+                    BitReader::<_, bitstream_io::LittleEndian>::new(Cursor::new(bit_bytes));
 
                 let version = bits.read_i32_le()?;
                 let brick_indices = bits.read_array(|r| r.read_uint(brick_count as u32))?;
-                
+
                 let mut property_names = vec![];
                 let mut properties = HashMap::new();
                 for _ in 0..bits.read_i32_le()? {
@@ -342,11 +391,14 @@ impl<R: Read + Seek> SaveReader<R> {
                     bricks[i as usize].components.insert(name.clone(), props);
                 }
 
-                components.insert(name, Component {
-                    version,
-                    brick_indices,
-                    properties,
-                });
+                components.insert(
+                    name,
+                    Component {
+                        version,
+                        brick_indices,
+                        properties,
+                    },
+                );
             }
         }
 
@@ -389,7 +441,10 @@ impl<R: Read + Seek> SaveReader<R> {
 }
 
 fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), ReadError> {
-    let (uncompressed_size, compressed_size) = (reader.read_i32::<LittleEndian>()?, reader.read_i32::<LittleEndian>()?);
+    let (uncompressed_size, compressed_size) = (
+        reader.read_i32::<LittleEndian>()?,
+        reader.read_i32::<LittleEndian>()?,
+    );
     if uncompressed_size < 0 || compressed_size < 0 || compressed_size >= uncompressed_size {
         return Err(ReadError::InvalidCompression);
     }

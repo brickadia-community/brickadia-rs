@@ -1,4 +1,4 @@
-use std::{cmp, io::{self, Write}};
+use std::io::{self, Write};
 
 use bitstream_io::BitWrite;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, WriteBytesExt};
@@ -55,7 +55,11 @@ pub trait WriteExt: Write {
         Ok(())
     }
 
-    fn write_array<F: FnMut(&mut Self, T) -> io::Result<()>, T>(&mut self, vec: Vec<T>, mut operation: F) -> io::Result<()> {
+    fn write_array<F: FnMut(&mut Self, T) -> io::Result<()>, T>(
+        &mut self,
+        vec: Vec<T>,
+        mut operation: F,
+    ) -> io::Result<()> {
         self.write_i32::<LittleEndian>(vec.len() as i32)?;
         for item in vec.into_iter() {
             operation(self, item)?;
@@ -154,7 +158,11 @@ pub trait BitWriteExt: BitWrite {
         self.write_bytes(&bytes)
     }
 
-    fn write_array<F: FnMut(&mut Self, &T) -> io::Result<()>, T>(&mut self, vec: &Vec<T>, mut operation: F) -> io::Result<()> {
+    fn write_array<F: FnMut(&mut Self, &T) -> io::Result<()>, T>(
+        &mut self,
+        vec: &Vec<T>,
+        mut operation: F,
+    ) -> io::Result<()> {
         let mut len_bytes = [0u8; 4];
         LittleEndian::write_i32(&mut len_bytes, vec.len() as i32);
         self.write_bytes(&len_bytes)?;

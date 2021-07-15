@@ -1,4 +1,7 @@
-use std::{cmp, io::{self, Read, Result}};
+use std::{
+    cmp,
+    io::{self, Read, Result},
+};
 
 use bitstream_io::BitRead;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
@@ -12,8 +15,11 @@ pub trait ReadExt: Read {
             size if size >= 0 => {
                 let mut chars = vec![0u8; cmp::max(0, size - 1) as usize];
                 self.read_exact(&mut chars)?;
-                if size > 0 { self.read_u8()?; } // read a null terminator
-                String::from_utf8(chars).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid string data"))
+                if size > 0 {
+                    self.read_u8()?;
+                } // read a null terminator
+                String::from_utf8(chars)
+                    .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid string data"))
             }
             size if size < 0 => {
                 let size = -size;
@@ -21,13 +27,18 @@ pub trait ReadExt: Read {
                     0 => {
                         let mut chars = vec![0; size as usize / 2];
                         self.read_u16_into::<LittleEndian>(&mut chars)?;
-                        String::from_utf16(&chars).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 string data"))
+                        String::from_utf16(&chars).map_err(|_| {
+                            io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 string data")
+                        })
                     }
-                    1 => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 size")),
-                    _ => unreachable!()
+                    1 => Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "invalid UCS-2 size",
+                    )),
+                    _ => unreachable!(),
                 }
-            },
-            _ => unreachable!()
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -39,7 +50,10 @@ pub trait ReadExt: Read {
         Ok(Uuid::from_bytes(bytes))
     }
 
-    fn read_array<F, T>(&mut self, mut operation: F) -> Result<Vec<T>> where F: FnMut(&mut Self) -> Result<T> {
+    fn read_array<F, T>(&mut self, mut operation: F) -> Result<Vec<T>>
+    where
+        F: FnMut(&mut Self) -> Result<T>,
+    {
         let len = self.read_i32::<LittleEndian>()?;
         let mut vec = Vec::with_capacity(len as usize);
         for _ in 0..len {
@@ -52,7 +66,10 @@ pub trait ReadExt: Read {
 impl<R> ReadExt for R where R: Read {}
 
 pub trait BitReadExt: BitRead {
-    fn read_array<F, T>(&mut self, mut operation: F) -> Result<Vec<T>> where F: FnMut(&mut Self) -> Result<T> {
+    fn read_array<F, T>(&mut self, mut operation: F) -> Result<Vec<T>>
+    where
+        F: FnMut(&mut Self) -> Result<T>,
+    {
         let len = self.read_i32_le()?;
         let mut vec = Vec::with_capacity(len as usize);
         for _ in 0..len {
@@ -103,8 +120,11 @@ pub trait BitReadExt: BitRead {
             size if size >= 0 => {
                 let mut chars = vec![0u8; cmp::max(0, size - 1) as usize];
                 self.read_bytes(&mut chars)?;
-                if size > 0 { self.read_bytes(&mut [0])?; } // read a null terminator
-                String::from_utf8(chars).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid string data"))
+                if size > 0 {
+                    self.read_bytes(&mut [0])?;
+                } // read a null terminator
+                String::from_utf8(chars)
+                    .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid string data"))
             }
             size if size < 0 => {
                 let size = -size;
@@ -112,13 +132,18 @@ pub trait BitReadExt: BitRead {
                     0 => {
                         let mut chars = vec![0; (size / 2) as usize];
                         self.read_u16_le_into(&mut chars)?;
-                        String::from_utf16(&chars).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 string data"))
+                        String::from_utf16(&chars).map_err(|_| {
+                            io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 string data")
+                        })
                     }
-                    1 => Err(io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 size")),
-                    _ => unreachable!()
+                    1 => Err(io::Error::new(
+                        io::ErrorKind::InvalidData,
+                        "invalid UCS-2 size",
+                    )),
+                    _ => unreachable!(),
                 }
-            },
-            _ => unreachable!()
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -156,7 +181,7 @@ pub trait BitReadExt: BitRead {
         self.read_bytes(&mut bytes)?;
         Ok(LittleEndian::read_f32(&bytes))
     }
-    
+
     fn read_unreal_type(&mut self, t: &str) -> Result<UnrealType> {
         match t {
             "Class" | "Object" => Ok(UnrealType::Class(self.read_string()?)),
@@ -172,8 +197,15 @@ pub trait BitReadExt: BitRead {
                 self.read_bytes(&mut byte)?;
                 Ok(UnrealType::Byte(byte[0]))
             }
-            "Rotator" => Ok(UnrealType::Rotator(self.read_f32_le()?, self.read_f32_le()?, self.read_f32_le()?)),
-            invalid => Err(io::Error::new(io::ErrorKind::InvalidData, format!("invalid unreal type specified: {}", invalid)))
+            "Rotator" => Ok(UnrealType::Rotator(
+                self.read_f32_le()?,
+                self.read_f32_le()?,
+                self.read_f32_le()?,
+            )),
+            invalid => Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("invalid unreal type specified: {}", invalid),
+            )),
         }
     }
 }

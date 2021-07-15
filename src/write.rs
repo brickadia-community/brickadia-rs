@@ -1,11 +1,19 @@
-use std::{cmp, collections::HashMap, io::{self, Write}};
+use std::{
+    cmp,
+    collections::HashMap,
+    io::{self, Write},
+};
 
-use bitstream_io::{BigEndian, BitWrite, BitWriter};
+use bitstream_io::{BitWrite, BitWriter};
 use byteorder::{ByteOrder, LittleEndian, WriteBytesExt};
-use flate2::{Compression, write::ZlibEncoder};
+use flate2::{write::ZlibEncoder, Compression};
 use thiserror::Error;
 
-use crate::{MAGIC_BYTES, SAVE_VERSION, ext::write::*, save::{BrickColor, SaveData, Size}};
+use crate::{
+    ext::write::*,
+    save::{BrickColor, SaveData, Size},
+    MAGIC_BYTES, SAVE_VERSION,
+};
 
 #[derive(Error, Debug)]
 pub enum WriteError {
@@ -27,7 +35,8 @@ impl<W: Write> SaveWriter<W> {
     fn write_header0(&mut self) -> Result<(), WriteError> {
         self.writer.write_all(&MAGIC_BYTES)?;
         self.writer.write_u16::<LittleEndian>(SAVE_VERSION)?;
-        self.writer.write_i32::<LittleEndian>(self.data.game_version)?;
+        self.writer
+            .write_i32::<LittleEndian>(self.data.game_version)?;
         Ok(())
     }
 
@@ -44,7 +53,12 @@ impl<W: Write> SaveWriter<W> {
 
         // if the host is None, then we assume it to be the
         // same as the author. can safely write the same value
-        let host = self.data.header1.host.clone().unwrap_or(self.data.header1.author.clone());
+        let host = self
+            .data
+            .header1
+            .host
+            .clone()
+            .unwrap_or(self.data.header1.author.clone());
         w.write_string(host.name)?;
         w.write_uuid(host.id)?;
 
@@ -59,19 +73,33 @@ impl<W: Write> SaveWriter<W> {
     pub fn write_header2(&mut self) -> Result<(), WriteError> {
         // see above for compression methods
         let mut w: Vec<u8> = vec![];
-        w.write_array(self.data.header2.mods.clone(), |writer, string| writer.write_string(string))?;
-        w.write_array(self.data.header2.brick_assets.clone(), |writer, string| writer.write_string(string))?;
-        w.write_array(self.data.header2.colors.clone(), |writer, color| writer.write_color_bgra(color))?;
-        w.write_array(self.data.header2.materials.clone(), |writer, string| writer.write_string(string))?;
-
-        w.write_array(self.data.header2.brick_owners.clone(), |writer, brick_owner| -> io::Result<()> {
-            writer.write_uuid(brick_owner.id)?;
-            writer.write_string(brick_owner.name)?;
-            writer.write_i32::<LittleEndian>(brick_owner.bricks as i32)?;
-            Ok(())
+        w.write_array(self.data.header2.mods.clone(), |writer, string| {
+            writer.write_string(string)
+        })?;
+        w.write_array(self.data.header2.brick_assets.clone(), |writer, string| {
+            writer.write_string(string)
+        })?;
+        w.write_array(self.data.header2.colors.clone(), |writer, color| {
+            writer.write_color_bgra(color)
+        })?;
+        w.write_array(self.data.header2.materials.clone(), |writer, string| {
+            writer.write_string(string)
         })?;
 
-        w.write_array(self.data.header2.physical_materials.clone(), |writer, string| writer.write_string(string))?;
+        w.write_array(
+            self.data.header2.brick_owners.clone(),
+            |writer, brick_owner| -> io::Result<()> {
+                writer.write_uuid(brick_owner.id)?;
+                writer.write_string(brick_owner.name)?;
+                writer.write_i32::<LittleEndian>(brick_owner.bricks as i32)?;
+                Ok(())
+            },
+        )?;
+
+        w.write_array(
+            self.data.header2.physical_materials.clone(),
+            |writer, string| writer.write_string(string),
+        )?;
 
         write_compressed(&mut self.writer, w)?;
 
@@ -85,7 +113,7 @@ impl<W: Write> SaveWriter<W> {
                 self.writer.write_i32::<LittleEndian>(data.len() as i32)?;
                 self.writer.write_all(&data[..])?;
             }
-            None => self.writer.write_i32::<LittleEndian>(0)?
+            None => self.writer.write_i32::<LittleEndian>(0)?,
         };
         Ok(())
     }
@@ -105,7 +133,7 @@ impl<W: Write> SaveWriter<W> {
         let mut i = 0;
         for brick in self.data.bricks.clone().into_iter() {
             bits.byte_align()?;
-            
+
             // write asset name index: <asset_name_index: u32; N>
             bits.write_uint(brick.asset_name_index, asset_name_count as u32)?;
 
@@ -198,10 +226,16 @@ impl<W: Write> SaveWriter<W> {
             bits.write_bytes(&version_bytes)?;
 
             // write brick indices
-            bits.write_array(&component_bricks[&name], |writer, &i| writer.write_uint(i, cmp::max(brick_count as u32, 2)))?;
+            bits.write_array(&component_bricks[&name], |writer, &i| {
+                writer.write_uint(i, cmp::max(brick_count as u32, 2))
+            })?;
 
             // write properties
-            let properties = component.properties.clone().into_iter().collect::<Vec<(String, String)>>();
+            let properties = component
+                .properties
+                .clone()
+                .into_iter()
+                .collect::<Vec<(String, String)>>();
             bits.write_array(&properties, |writer, (key, val)| -> io::Result<()> {
                 writer.write_string(key.clone())?;
                 writer.write_string(val.clone())?;
@@ -210,12 +244,17 @@ impl<W: Write> SaveWriter<W> {
 
             // read brick indices
             for &i in component_bricks[&name].iter() {
-                for (p, _) in component.properties.clone().into_iter().collect::<Vec<(String, String)>>() {
+                for (p, _) in component
+                    .properties
+                    .clone()
+                    .into_iter()
+                    .collect::<Vec<(String, String)>>()
+                {
                     let brick = &self.data.bricks[i as usize];
                     bits.write_unreal(brick.components[&name][&p].clone())?;
                 }
             }
-            
+
             bits.byte_align()?;
             vec = bits.into_writer();
         }

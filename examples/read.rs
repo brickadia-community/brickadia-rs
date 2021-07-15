@@ -1,6 +1,6 @@
 use std::{env, fs::File, io::Write};
 
-use brickadia::read::{ReadError, SaveReader};
+use brickadia::read::SaveReader;
 
 fn main() {
     let read_location = env::args().nth(1).unwrap_or("examples/read.brs".into());
@@ -11,7 +11,10 @@ fn main() {
     let header2 = reader.read_header2().unwrap();
     println!("Read header 2: {:?}\n", header2);
     let preview = reader.read_preview().unwrap();
-    println!("Read preview, present? {}", if preview.is_some() { "yes" } else { "no" });
+    println!(
+        "Read preview, present? {}",
+        if preview.is_some() { "yes" } else { "no" }
+    );
     if preview.is_some() {
         let mut file = File::create("examples/save_preview.out.png").unwrap();
         file.write_all(&preview.unwrap()).unwrap();
