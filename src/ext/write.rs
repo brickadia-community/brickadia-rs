@@ -113,7 +113,7 @@ pub trait BitWriteExt: BitWrite {
         let mut new_value = 0;
         let mut mask = 1;
 
-        while (new_value + mask) < max && mask != 0 {
+        while new_value + mask < max && mask != 0 {
             self.write_bit(value & mask != 0)?;
             if value & mask != 0 {
                 new_value |= mask;
@@ -133,7 +133,7 @@ pub trait BitWriteExt: BitWrite {
 
     fn write_uint_packed(&mut self, mut value: u32) -> io::Result<()> {
         loop {
-            let src = [(value & 0b11_1111) as u8];
+            let src = [(value & 0b111_1111) as u8];
             value >>= 7;
             self.write_bit(value != 0)?;
             self.write_bits(&src, 7)?;
@@ -145,7 +145,7 @@ pub trait BitWriteExt: BitWrite {
     }
 
     fn write_int_packed(&mut self, value: i32) -> io::Result<()> {
-        self.write_uint_packed(((value.abs() as u32) << 1) | (value.is_positive() as u32))
+        self.write_uint_packed(((value.abs() as u32) << 1) | if value >= 0 { 1 } else { 0 })
     }
 
     fn write_f32(&mut self, value: f32) -> io::Result<()> {

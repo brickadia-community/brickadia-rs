@@ -26,7 +26,7 @@ fn main() {
             let mut brick = Brick::default();
             brick.position = (x * 10, y * 10, 10);
             brick.size = Size::Procedural(5, 5, 6);
-            brick.color = BrickColor::Unique(Color { r: (x / 10 * 255) as u8, g: (y / 10 * 255) as u8, b: 255, a: 255 });
+            brick.color = BrickColor::Unique(Color { r: (x as f32 / 10.0 * 255.0) as u8, g: 255, b: (y as f32 / 10.0 * 255.0) as u8, a: 255 });
             save.bricks.push(brick);
         }
     }

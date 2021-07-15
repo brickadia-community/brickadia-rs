@@ -137,8 +137,8 @@ impl<R: Read + Seek> SaveReader<R> {
 
         // match brick owners:
         // version >= 3: match brick owner:
-        //               version >= 8: a user (string followed by uuid), then an i32 for brick count
-        //                       else: a user (string followed by uuid)
+        //               version >= 8: a user (uuid followed by string), then an i32 for brick count
+        //                       else: a user (uuid followed by string)
         let brick_owners = match self.version {
             _ if self.version >= 3 => cursor.read_array(|r| -> io::Result<BrickOwner> {
                 match self.version {
@@ -225,9 +225,9 @@ impl<R: Read + Seek> SaveReader<R> {
         let mut bits = BitReader::<_, bitstream_io::LittleEndian>::new(cursor);
 
         let brick_count = header1.brick_count as usize;
-        let brick_asset_count = header2.brick_assets.len();
-        let material_count = header2.materials.len();
-        let physical_material_count = header2.physical_materials.len();
+        let brick_asset_count = cmp::max(header2.brick_assets.len(), 2);
+        let material_count = cmp::max(header2.materials.len(), 2);
+        let physical_material_count = cmp::max(header2.physical_materials.len(), 2);
 
         let mut bricks = vec![];
         let mut components = HashMap::new();
@@ -238,7 +238,7 @@ impl<R: Read + Seek> SaveReader<R> {
             bits.byte_align();
             if bricks.len() >= brick_count || bits.reader().unwrap().position() >= len as u64 { break; }
 
-            let asset_name_index = bits.read_uint(cmp::max(2, brick_asset_count as u32))?;
+            let asset_name_index = bits.read_uint(brick_asset_count as u32)?;
 
             let size = match bits.read_bit()? {
                 true => Size::Procedural(bits.read_uint_packed()?, bits.read_uint_packed()?, bits.read_uint_packed()?),

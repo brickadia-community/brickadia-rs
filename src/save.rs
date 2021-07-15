@@ -236,7 +236,7 @@ impl Default for Brick {
             physical_index: 0,
             material_intensity: 5,
             color: BrickColor::Index(0),
-            owner_index: 1,
+            owner_index: 0,
             components: HashMap::new(),
         }
     }

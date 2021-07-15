@@ -143,7 +143,7 @@ impl<W: Write> SaveWriter<W> {
 
             // write material index: <material_index: u32; N>
             bits.write_uint(brick.material_index, material_count as u32)?;
-            
+
             // write physical index: <physical_index: u32; N>
             bits.write_uint(brick.physical_index, physical_material_count as u32)?;
 
@@ -179,6 +179,8 @@ impl<W: Write> SaveWriter<W> {
 
             i += 1;
         }
+
+        bits.byte_align()?;
 
         write_compressed(&mut self.writer, vec)?;
 
