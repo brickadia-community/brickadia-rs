@@ -101,16 +101,16 @@ pub trait BitReadExt: BitRead {
     fn read_string(&mut self) -> Result<String> {
         match self.read_i32_le()? {
             size if size >= 0 => {
-                let mut chars = vec![0u8; size as usize];
+                let mut chars = vec![0u8; cmp::max(0, size - 1) as usize];
                 self.read_bytes(&mut chars)?;
+                if size > 0 { self.read_bytes(&mut [0])?; } // read a null terminator
                 String::from_utf8(chars).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid string data"))
             }
             size if size < 0 => {
-                // what even is ucs2?
                 let size = -size;
                 match size % 2 {
                     0 => {
-                        let mut chars = vec![0u16; (size / 2) as usize];
+                        let mut chars = vec![0; (size / 2) as usize];
                         self.read_u16_le_into(&mut chars)?;
                         String::from_utf16(&chars).map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 string data"))
                     }

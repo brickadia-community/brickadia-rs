@@ -221,7 +221,7 @@ impl<R: Read + Seek> SaveReader<R> {
         }
 
         let (cursor, len) = read_compressed(&mut self.reader)?;
-        let mut bits = BitReader::<_, BigEndian>::new(cursor);
+        let mut bits = BitReader::<_, bitstream_io::LittleEndian>::new(cursor);
 
         let brick_count = header1.brick_count as usize;
         let brick_asset_count = header2.brick_assets.len();
@@ -306,8 +306,6 @@ impl<R: Read + Seek> SaveReader<R> {
                 components: HashMap::new(),
             };
 
-            println!("{:?}", brick);
-
             bricks.push(brick);
         }
 
@@ -321,21 +319,24 @@ impl<R: Read + Seek> SaveReader<R> {
 
                 let mut bit_bytes = vec![0u8; cursor.read_i32::<LittleEndian>()? as usize];
                 cursor.read_exact(&mut bit_bytes)?;
-                let mut bits = BitReader::<_, BigEndian>::new(Cursor::new(bit_bytes));
+                let mut bits = BitReader::<_, bitstream_io::LittleEndian>::new(Cursor::new(bit_bytes));
 
                 let version = bits.read_i32_le()?;
                 let brick_indices = bits.read_array(|r| r.read_uint(brick_count as u32))?;
                 
+                let mut property_names = vec![];
                 let mut properties = HashMap::new();
                 for _ in 0..bits.read_i32_le()? {
-                    properties.insert(bits.read_string()?, bits.read_string()?);
+                    let name = bits.read_string()?;
+                    property_names.push(name.clone());
+                    properties.insert(name, bits.read_string()?);
                 }
 
                 // components for each brick
                 for &i in brick_indices.iter() {
                     let mut props = HashMap::new();
-                    for (key, val) in properties.iter() {
-                        props.insert(key.clone(), bits.read_unreal_type(&val[..])?);
+                    for key in property_names.iter() {
+                        props.insert(key.clone(), bits.read_unreal_type(&properties[key][..])?);
                     }
                     bricks[i as usize].components.insert(name.clone(), props);
                 }
