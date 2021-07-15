@@ -67,7 +67,7 @@ impl<W: Write> SaveWriter<W> {
         w.write_array(self.data.header2.brick_owners.clone(), |writer, brick_owner| -> io::Result<()> {
             writer.write_uuid(brick_owner.id)?;
             writer.write_string(brick_owner.name)?;
-            writer.write_i32::<LittleEndian>(brick_owner.bricks.unwrap_or(0) as i32)?;
+            writer.write_i32::<LittleEndian>(brick_owner.bricks as i32)?;
             Ok(())
         })?;
 
@@ -81,7 +81,7 @@ impl<W: Write> SaveWriter<W> {
     pub fn write_preview(&mut self) -> Result<(), WriteError> {
         match self.data.preview.clone() {
             Some(data) => {
-                self.writer.write_i32::<LittleEndian>(1)?;
+                self.writer.write_u8(1)?;
                 self.writer.write_i32::<LittleEndian>(data.len() as i32)?;
                 self.writer.write_all(&data[..])?;
             }
@@ -94,10 +94,10 @@ impl<W: Write> SaveWriter<W> {
         let mut vec = vec![];
         let mut bits = BitWriter::endian(&mut vec, bitstream_io::LittleEndian);
 
-        let asset_name_count = self.data.header2.brick_assets.len();
-        let material_count = self.data.header2.materials.len();
-        let physical_material_count = self.data.header2.physical_materials.len();
-        let color_count = self.data.header2.colors.len();
+        let asset_name_count = cmp::max(self.data.header2.brick_assets.len(), 2);
+        let material_count = cmp::max(self.data.header2.materials.len(), 2);
+        let physical_material_count = cmp::max(self.data.header2.physical_materials.len(), 2);
+        let color_count = cmp::max(self.data.header2.colors.len(), 2);
         let brick_count = self.data.bricks.len();
 
         let mut component_bricks: HashMap<String, Vec<u32>> = HashMap::new();
@@ -154,9 +154,9 @@ impl<W: Write> SaveWriter<W> {
             // <unique?: bit 0><index: uint; N> OR
             // <unique?: bit 1><r: byte><g: byte><b: byte>
             match brick.color {
-                BrickColor::Index(i) => {
+                BrickColor::Index(ind) => {
                     bits.write_bit(false)?;
-                    bits.write_uint(i, color_count as u32)?;
+                    bits.write_uint(ind, color_count as u32)?;
                 }
                 BrickColor::Unique(color) => {
                     bits.write_bit(true)?;
@@ -183,6 +183,7 @@ impl<W: Write> SaveWriter<W> {
         write_compressed(&mut self.writer, vec)?;
 
         let mut vec: Vec<u8> = vec![];
+        vec.write_i32::<LittleEndian>(self.data.components.len() as i32)?;
 
         for (name, component) in self.data.components.clone().into_iter() {
             vec.write_string(name.clone())?;

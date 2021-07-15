@@ -107,7 +107,7 @@ impl Default for Header2 {
             colors: vec![],
             materials: vec!["BMC_Plastic".into()],
             brick_owners: vec![],
-            physical_materials: vec![],
+            physical_materials: vec!["BPMC_Default".into()],
         }
     }
 }
@@ -137,20 +137,24 @@ impl Default for User {
     }
 }
 
-/// A brick owner. Similar to a user, but stores an Option<u32> representing bricks in save.
-///
-/// A `None` for `bricks` will set `0` in the save.
+/// A brick owner. Similar to a user, but stores an u32 representing bricks in save.
 #[derive(Debug, Clone)]
 pub struct BrickOwner {
     /// The brick owner's name.
     pub name: String,
     pub id: Uuid,
-    pub bricks: Option<u32>
+    pub bricks: u32,
 }
 
 impl From<User> for BrickOwner {
     fn from(user: User) -> Self {
-        BrickOwner { name: user.name, id: user.id, bricks: None }
+        BrickOwner { name: user.name, id: user.id, bricks: 0 }
+    }
+}
+
+impl BrickOwner {
+    pub fn from_user_bricks(user: User, bricks: u32) -> Self {
+        BrickOwner {name: user.name, id: user.id, bricks: bricks }
     }
 }
 
@@ -232,7 +236,7 @@ impl Default for Brick {
             physical_index: 0,
             material_intensity: 5,
             color: BrickColor::Index(0),
-            owner_index: 0,
+            owner_index: 1,
             components: HashMap::new(),
         }
     }

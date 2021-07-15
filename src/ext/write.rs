@@ -1,4 +1,4 @@
-use std::io::{self, Write};
+use std::{cmp, io::{self, Write}};
 
 use bitstream_io::BitWrite;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, WriteBytesExt};
@@ -118,7 +118,7 @@ pub trait BitWriteExt: BitWrite {
             if value & mask != 0 {
                 new_value |= mask;
             }
-            mask *= 2;
+            mask <<= 1;
         }
 
         Ok(())

@@ -23,6 +23,8 @@ pub enum ReadError {
     InvalidDataHeader2,
     #[error("must read in sequence: header 1, header 2, [preview], bricks")]
     BadSectionReadOrder,
+    #[error("invalid compressed section")]
+    InvalidCompression,
 }
 
 pub struct SaveReader<R: Read + Seek> {
@@ -143,9 +145,8 @@ impl<R: Read + Seek> SaveReader<R> {
                     _ if self.version >= 8 => {
                         let id = r.read_uuid()?;
                         let name = r.read_string()?;
-                        let bricks = r.read_i32::<LittleEndian>()?;
-                        if bricks < 0 { return Err(io::Error::new(io::ErrorKind::InvalidData, "")); }
-                        Ok(BrickOwner { name, id, bricks: Some(bricks as u32) })
+                        let bricks = r.read_i32::<LittleEndian>()? as u32;
+                        Ok(BrickOwner { name, id, bricks })
                     }
                     _ => {
                         let id = r.read_uuid()?;
@@ -264,12 +265,12 @@ impl<R: Read + Seek> SaveReader<R> {
 
             let physical_index = match self.version {
                 _ if self.version >= 9 => bits.read_uint(physical_material_count as u32)?,
-                _ => 0
+                _ => 0,
             };
 
             let material_intensity = match self.version {
                 _ if self.version >= 9 => bits.read_uint(11)?,
-                _ => 5
+                _ => 5,
             };
 
             let color = match bits.read_bit()? {
@@ -390,7 +391,7 @@ impl<R: Read + Seek> SaveReader<R> {
 fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), ReadError> {
     let (uncompressed_size, compressed_size) = (reader.read_i32::<LittleEndian>()?, reader.read_i32::<LittleEndian>()?);
     if uncompressed_size < 0 || compressed_size < 0 || compressed_size >= uncompressed_size {
-        return Err(ReadError::InvalidDataHeader1);
+        return Err(ReadError::InvalidCompression);
     }
 
     if compressed_size == 0 {
