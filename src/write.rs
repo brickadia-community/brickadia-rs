@@ -92,7 +92,7 @@ impl<W: Write> SaveWriter<W> {
 
     pub fn write_bricks(&mut self) -> Result<(), WriteError> {
         let mut vec = vec![];
-        let mut bits = BitWriter::endian(&mut vec, BigEndian);
+        let mut bits = BitWriter::endian(&mut vec, bitstream_io::LittleEndian);
 
         let asset_name_count = self.data.header2.brick_assets.len();
         let material_count = self.data.header2.materials.len();
@@ -187,7 +187,7 @@ impl<W: Write> SaveWriter<W> {
         for (name, component) in self.data.components.clone().into_iter() {
             vec.write_string(name.clone())?;
 
-            let mut bits = BitWriter::endian(vec, BigEndian);
+            let mut bits = BitWriter::endian(vec, bitstream_io::LittleEndian);
             let mut version_bytes = [0u8; 4];
             LittleEndian::write_i32(&mut version_bytes, component.version);
 

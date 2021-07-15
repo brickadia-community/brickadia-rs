@@ -8,6 +8,12 @@ use crate::save::{Color, UnrealType};
 
 pub trait WriteExt: Write {
     fn write_string(&mut self, string: String) -> io::Result<()> {
+        if string.len() == 0 {
+            // write out a 0 and nothing else
+            self.write_i32::<LittleEndian>(0)?;
+            return Ok(());
+        }
+
         if string.is_ascii() {
             // write utf-8: positive length
             self.write_i32::<LittleEndian>(string.len() as i32 + 1)?;
