@@ -1,12 +1,23 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, fmt};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use uuid::Uuid;
+
+#[cfg(feature = "serialize")]
+use {
+    serde::{
+        de::{self, Visitor},
+        ser::SerializeTuple,
+        Deserialize, Deserializer, Serialize, Serializer,
+    },
+    serde_repr::{Deserialize_repr, Serialize_repr},
+};
 
 use crate::SAVE_VERSION;
 
 /// Every part of a save file.
 #[derive(Debug)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct SaveData {
     /// The version of the save. Only relevant for reads; this automatically uses `SAVE_VERSION` when writing.
     pub version: u16,
@@ -15,12 +26,15 @@ pub struct SaveData {
     pub game_version: i32,
 
     /// The first header of the save.
+    #[cfg_attr(feature = "serialize", serde(flatten))]
     pub header1: Header1,
 
     /// The second header of the save.
+    #[cfg_attr(feature = "serialize", serde(flatten))]
     pub header2: Header2,
 
     /// The preview of the save, if any.
+    #[cfg_attr(feature = "serialize", serde(skip))]
     pub preview: Option<Vec<u8>>,
 
     /// The bricks in the save.
@@ -45,6 +59,7 @@ impl Default for SaveData {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Header1 {
     /// The map the save was saved on.
     pub map: String,
@@ -79,6 +94,7 @@ impl Default for Header1 {
 }
 
 #[derive(Debug)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Header2 {
     /// A list of mods, each a String.
     pub mods: Vec<String>,
@@ -113,6 +129,7 @@ impl Default for Header2 {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum UnrealType {
     Class(String),
     Boolean(bool),
@@ -123,6 +140,7 @@ pub enum UnrealType {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct User {
     /// The user's name.
     pub name: String,
@@ -142,6 +160,7 @@ impl Default for User {
 
 /// A brick owner. Similar to a user, but stores an u32 representing bricks in save.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct BrickOwner {
     /// The brick owner's name.
     pub name: String,
@@ -178,6 +197,55 @@ pub struct Color {
     pub a: u8,
 }
 
+#[cfg(feature = "serialize")]
+impl Serialize for Color {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut tup = serializer.serialize_tuple(4)?;
+        tup.serialize_element(&self.r)?;
+        tup.serialize_element(&self.g)?;
+        tup.serialize_element(&self.b)?;
+        tup.serialize_element(&self.a)?;
+        tup.end()
+    }
+}
+
+#[cfg(feature = "serialize")]
+struct ColorVisitor;
+
+#[cfg(feature = "serialize")]
+impl<'de> Visitor<'de> for ColorVisitor {
+    type Value = Color;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "a color (an array of either 3 or 4 bytes)")
+    }
+
+    fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
+    where
+        A: serde::de::SeqAccess<'de>,
+    {
+        let r = seq
+            .next_element()?
+            .ok_or(de::Error::invalid_length(0, &"3 or 4"))?;
+        let g = seq
+            .next_element()?
+            .ok_or(de::Error::invalid_length(1, &"3 or 4"))?;
+        let b = seq
+            .next_element()?
+            .ok_or(de::Error::invalid_length(2, &"3 or 4"))?;
+        let a = seq.next_element()?.unwrap_or(255);
+
+        Ok(Color { r, g, b, a })
+    }
+}
+
+#[cfg(feature = "serialize")]
+impl<'de> Deserialize<'de> for Color {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(ColorVisitor)
+    }
+}
+
 impl Color {
     /// Converts a slice of 4 bytes (bgra) to a Color (rgba).
     pub fn from_bytes_bgra(slice: [u8; 4]) -> Self {
@@ -202,6 +270,7 @@ impl Color {
 
 /// A brick.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Brick {
     /// The asset name index of the brick, referring to `Header2`'s `brick_assets`.
     pub asset_name_index: u32,
@@ -266,6 +335,7 @@ impl Default for Brick {
 /// Represents a brick's direction.
 #[repr(u8)]
 #[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serialize", derive(Serialize_repr, Deserialize_repr))]
 pub enum Direction {
     XPositive,
     XNegative,
@@ -278,6 +348,7 @@ pub enum Direction {
 /// Represents a brick's rotation.
 #[repr(u8)]
 #[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive)]
+#[cfg_attr(feature = "serialize", derive(Serialize_repr, Deserialize_repr))]
 pub enum Rotation {
     Deg0,
     Deg90,
@@ -291,8 +362,61 @@ pub enum Rotation {
 /// Static mesh bricks should use `Size::Empty`.
 #[derive(Debug, Clone)]
 pub enum Size {
-    Procedural(u32, u32, u32),
     Empty,
+    Procedural(u32, u32, u32),
+}
+
+#[cfg(feature = "serialize")]
+impl Serialize for Size {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let (x, y, z) = match self {
+            Size::Empty => (&0, &0, &0),
+            Size::Procedural(x, y, z) => (x, y, z),
+        };
+
+        let mut tup = serializer.serialize_tuple(3)?;
+        tup.serialize_element(x)?;
+        tup.serialize_element(y)?;
+        tup.serialize_element(z)?;
+        tup.end()
+    }
+}
+
+#[cfg(feature = "serialize")]
+struct SizeVisitor;
+
+#[cfg(feature = "serialize")]
+impl<'de> Visitor<'de> for SizeVisitor {
+    type Value = Size;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "an array of 3 numbers")
+    }
+
+    fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+        let x = seq
+            .next_element()?
+            .ok_or(de::Error::invalid_length(0, &"3 numbers"))?;
+        let y = seq
+            .next_element()?
+            .ok_or(de::Error::invalid_length(1, &"3 numbers"))?;
+        let z = seq
+            .next_element()?
+            .ok_or(de::Error::invalid_length(2, &"3 numbers"))?;
+
+        if x == 0 && y == 0 && z == 0 {
+            Ok(Size::Empty)
+        } else {
+            Ok(Size::Procedural(x, y, z))
+        }
+    }
+}
+
+#[cfg(feature = "serialize")]
+impl<'de> Deserialize<'de> for Size {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        deserializer.deserialize_any(SizeVisitor)
+    }
 }
 
 /// Represents a brick's color.
@@ -300,13 +424,15 @@ pub enum Size {
 /// Bricks that refer to a color in their save should use `BrickColor::Index`.
 /// Bricks defining their own `Color` should use `BrickColor::Unique`.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum BrickColor {
-    Unique(Color),
     Index(u32),
+    Unique(Color),
 }
 
 /// Represents a brick's collision flags.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Collision {
     pub player: bool,
     pub weapon: bool,
@@ -333,6 +459,7 @@ impl Default for Collision {
 
 /// A component.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Component {
     pub version: i32,
     pub brick_indices: Vec<u32>,

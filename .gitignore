@@ -1,3 +1,4 @@
+/.vscode
 *.out.*
 /target
 Cargo.lock
