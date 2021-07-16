@@ -362,7 +362,10 @@ pub enum Rotation {
 /// Static mesh bricks should use `Size::Empty`.
 #[derive(Debug, Clone)]
 pub enum Size {
+    /// A singularity (used for non-procedural bricks).
     Empty,
+
+    /// A brick that is procedural.
     Procedural(u32, u32, u32),
 }
 
@@ -426,7 +429,10 @@ impl<'de> Deserialize<'de> for Size {
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum BrickColor {
+    /// A color that links to an index in the save palette.
     Index(u32),
+
+    /// A unique color for this brick.
     Unique(Color),
 }
 
@@ -462,7 +468,11 @@ impl Default for Collision {
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Component {
     pub version: i32,
+
+    /// The indices of bricks this component is on.
     pub brick_indices: Vec<u32>,
+
+    /// A map from property name to Unreal type (see `UnrealType`).
     pub properties: HashMap<String, String>,
 }
 

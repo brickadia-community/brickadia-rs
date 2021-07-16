@@ -15,12 +15,14 @@ use crate::{
     MAGIC_BYTES, SAVE_VERSION,
 };
 
+/// A write error.
 #[derive(Error, Debug)]
 pub enum WriteError {
     #[error("generic io error")]
     IoError(#[from] io::Error),
 }
 
+/// A save writer, which writes its `data` to its `writer` (a `Write`).
 pub struct SaveWriter<W: Write> {
     writer: W,
     data: SaveData,
@@ -40,6 +42,7 @@ impl<W: Write> SaveWriter<W> {
         Ok(())
     }
 
+    /// Writes the first header.
     pub fn write_header1(&mut self) -> Result<(), WriteError> {
         self.write_header0()?;
 
@@ -70,6 +73,7 @@ impl<W: Write> SaveWriter<W> {
         Ok(())
     }
 
+    /// Writes the second header.
     pub fn write_header2(&mut self) -> Result<(), WriteError> {
         // see above for compression methods
         let mut w: Vec<u8> = vec![];
@@ -106,6 +110,7 @@ impl<W: Write> SaveWriter<W> {
         Ok(())
     }
 
+    /// Writes the preview.
     pub fn write_preview(&mut self) -> Result<(), WriteError> {
         match self.data.preview.clone() {
             Some(data) => {
@@ -118,6 +123,7 @@ impl<W: Write> SaveWriter<W> {
         Ok(())
     }
 
+    /// Writes the bricks and components.
     pub fn write_bricks(&mut self) -> Result<(), WriteError> {
         let mut vec = vec![];
         let mut bits = BitWriter::endian(&mut vec, bitstream_io::LittleEndian);
@@ -264,6 +270,7 @@ impl<W: Write> SaveWriter<W> {
         Ok(())
     }
 
+    /// Writes the full save.
     pub fn write(&mut self) -> Result<(), WriteError> {
         self.write_header1()?;
         self.write_header2()?;
@@ -273,6 +280,7 @@ impl<W: Write> SaveWriter<W> {
     }
 }
 
+/// Write a `Vec<u8>` out to a `Write`, following the BRS spec for compression.
 fn write_compressed(writer: &mut impl Write, vec: Vec<u8>) -> io::Result<()> {
     let compressed = ZlibEncoder::new(vec.clone(), Compression::default()).finish()?;
 

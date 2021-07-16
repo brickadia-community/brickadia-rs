@@ -16,6 +16,7 @@ lazy_static::lazy_static! {
     static ref DEFAULT_MATERIALS: Vec<String> = vec!["BMC_Hologram", "BMC_Plastic", "BMC_Glow", "BMC_Metallic", "BMC_Glass"].into_iter().map(|s| s.into()).collect();
 }
 
+/// A read error.
 #[derive(Error, Debug)]
 pub enum ReadError {
     #[error("generic io error")]
@@ -32,6 +33,7 @@ pub enum ReadError {
     InvalidCompression,
 }
 
+/// A save reader, which reads data from its `reader` (a `Read + Seek`).
 pub struct SaveReader<R: Read + Seek> {
     reader: R,
     pub version: u16,
@@ -43,6 +45,7 @@ pub struct SaveReader<R: Read + Seek> {
 }
 
 impl<R: Read + Seek> SaveReader<R> {
+    /// Create a new save reader from an existing `reader`, a `Read + Seek`.
     pub fn new(mut reader: R) -> Result<Self, ReadError> {
         let mut magic = [0u8; 3];
         reader.read_exact(&mut magic)?;
@@ -67,6 +70,7 @@ impl<R: Read + Seek> SaveReader<R> {
         })
     }
 
+    /// Read the first header.
     pub fn read_header1(&mut self) -> Result<Header1, ReadError> {
         let (mut cursor, _) = read_compressed(&mut self.reader)?;
 
@@ -126,6 +130,7 @@ impl<R: Read + Seek> SaveReader<R> {
         })
     }
 
+    /// Read the second header.
     pub fn read_header2(&mut self) -> Result<Header2, ReadError> {
         if !self.header1_read {
             return Err(ReadError::BadSectionReadOrder);
@@ -196,6 +201,10 @@ impl<R: Read + Seek> SaveReader<R> {
         })
     }
 
+    /// Read the preview in the save.
+    ///
+    /// The preview is an `Option<Vec<u8>>`, as the save might not actually have
+    /// preview data.
     pub fn read_preview(&mut self) -> Result<Option<Vec<u8>>, ReadError> {
         if !self.header2_read {
             return Err(ReadError::BadSectionReadOrder);
@@ -217,6 +226,7 @@ impl<R: Read + Seek> SaveReader<R> {
         }
     }
 
+    /// Skip over the preview section.
     pub fn skip_preview(&mut self) -> Result<(), ReadError> {
         if !self.header2_read {
             return Err(ReadError::BadSectionReadOrder);
@@ -235,6 +245,7 @@ impl<R: Read + Seek> SaveReader<R> {
         Ok(())
     }
 
+    /// Read the bricks and components from a save.
     pub fn read_bricks(
         &mut self,
         header1: &Header1,
@@ -405,6 +416,7 @@ impl<R: Read + Seek> SaveReader<R> {
         Ok((bricks, components))
     }
 
+    /// Read all parts of a save into a `SaveData`.
     pub fn read_all(&mut self) -> Result<SaveData, ReadError> {
         let header1 = self.read_header1()?;
         let header2 = self.read_header2()?;
@@ -422,6 +434,7 @@ impl<R: Read + Seek> SaveReader<R> {
         })
     }
 
+    /// Read all parts of a save (except the preview) into a `SaveData`.
     pub fn read_all_skip_preview(&mut self) -> Result<SaveData, ReadError> {
         let header1 = self.read_header1()?;
         let header2 = self.read_header2()?;
@@ -440,6 +453,7 @@ impl<R: Read + Seek> SaveReader<R> {
     }
 }
 
+/// Read a compressed section from a `Read`, following the BRS spec for compressed sections.
 fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), ReadError> {
     let (uncompressed_size, compressed_size) = (
         reader.read_i32::<LittleEndian>()?,
