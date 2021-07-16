@@ -1,10 +1,11 @@
-use std::{collections::HashMap, fmt};
+use std::{collections::HashMap};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use uuid::Uuid;
 
 #[cfg(feature = "serialize")]
 use {
+    std::fmt,
     serde::{
         de::{self, Visitor},
         ser::SerializeTuple,
