@@ -106,3 +106,9 @@ fn main() {
     println!("Save written!");
 }
 ```
+
+## Credits
+
+* [voximity](https://github.com/voximity) - creator, maintainer
+* [Meshiest](https://github.com/Meshiest) - [brs-js](https://github.com/brickadia-community/brs-js) reference
+* [qoh](https://github.com/qoh) - [brs](https://github.com/brickadia/brs), original library
