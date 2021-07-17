@@ -8,7 +8,7 @@ use crate::save::{Color, UnrealType};
 
 pub trait WriteExt: Write {
     fn write_string(&mut self, string: String) -> io::Result<()> {
-        if string.len() == 0 {
+        if string.is_empty() {
             // write out a 0 and nothing else
             self.write_i32::<LittleEndian>(0)?;
             return Ok(());
@@ -160,14 +160,14 @@ pub trait BitWriteExt: BitWrite {
 
     fn write_array<F: FnMut(&mut Self, &T) -> io::Result<()>, T>(
         &mut self,
-        vec: &Vec<T>,
+        vec: &[T],
         mut operation: F,
     ) -> io::Result<()> {
         let mut len_bytes = [0u8; 4];
         LittleEndian::write_i32(&mut len_bytes, vec.len() as i32);
         self.write_bytes(&len_bytes)?;
 
-        for item in vec.iter() {
+        for item in vec {
             operation(self, item)?;
         }
         Ok(())

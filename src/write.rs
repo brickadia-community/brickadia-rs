@@ -52,7 +52,7 @@ impl<W: Write> SaveWriter<W> {
         w.write_string(self.data.header1.map.clone())?;
         w.write_string(self.data.header1.author.name.clone())?;
         w.write_string(self.data.header1.description.clone())?;
-        w.write_uuid(self.data.header1.author.id.clone())?;
+        w.write_uuid(self.data.header1.author.id)?;
 
         // if the host is None, then we assume it to be the
         // same as the author. can safely write the same value
@@ -61,7 +61,7 @@ impl<W: Write> SaveWriter<W> {
             .header1
             .host
             .clone()
-            .unwrap_or(self.data.header1.author.clone());
+            .unwrap_or_else(|| self.data.header1.author.clone());
         w.write_string(host.name)?;
         w.write_uuid(host.id)?;
 
@@ -136,8 +136,7 @@ impl<W: Write> SaveWriter<W> {
 
         let mut component_bricks: HashMap<String, Vec<u32>> = HashMap::new();
 
-        let mut i = 0;
-        for brick in self.data.bricks.clone().into_iter() {
+        for (i, brick) in self.data.bricks.clone().into_iter().enumerate() {
             bits.byte_align()?;
 
             // write asset name index: <asset_name_index: u32; N>
@@ -204,14 +203,12 @@ impl<W: Write> SaveWriter<W> {
 
             for (key, _) in brick.components {
                 match component_bricks.get_mut(&key) {
-                    Some(vec) => vec.push(i),
+                    Some(vec) => vec.push(i as u32),
                     None => {
-                        component_bricks.insert(key, vec![i]);
+                        component_bricks.insert(key, vec![i as u32]);
                     }
                 }
             }
-
-            i += 1;
         }
 
         bits.byte_align()?;
@@ -284,14 +281,14 @@ impl<W: Write> SaveWriter<W> {
 fn write_compressed(writer: &mut impl Write, vec: Vec<u8>) -> io::Result<()> {
     let compressed = ZlibEncoder::new(vec.clone(), Compression::default()).finish()?;
 
+    writer.write_i32::<LittleEndian>(vec.len() as i32)?;
+
     if compressed.len() < vec.len() {
         // compressed is smaller, write (unc_size: i32, c_size: i32, bytes)
-        writer.write_i32::<LittleEndian>(vec.len() as i32)?;
         writer.write_i32::<LittleEndian>(compressed.len() as i32)?;
         writer.write_all(&compressed[..])?;
     } else {
         // write uncompressed (unc_size: i32, c_size: i32 = 0, bytes)
-        writer.write_i32::<LittleEndian>(vec.len() as i32)?;
         writer.write_i32::<LittleEndian>(0)?;
         writer.write_all(&vec[..])?;
     }

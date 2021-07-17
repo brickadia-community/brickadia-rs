@@ -175,7 +175,7 @@ impl<R: Read + Seek> SaveReader<R> {
                     _ => {
                         let id = r.read_uuid()?;
                         let name = r.read_string()?;
-                        Ok(BrickOwner::from(User { id, name }))
+                        Ok(BrickOwner::from(User { name, id }))
                     }
                 }
             })?,
@@ -463,18 +463,17 @@ fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), Rea
         return Err(ReadError::InvalidCompression);
     }
 
+    let mut bytes = vec![0u8; uncompressed_size as usize];
+
     if compressed_size == 0 {
         // no need to decompress first
-        let mut bytes = vec![0u8; uncompressed_size as usize];
         reader.read_exact(&mut bytes)?;
-        Ok((Cursor::new(bytes), uncompressed_size))
     } else {
         // decompress first, then read
         let mut compressed = vec![0u8; compressed_size as usize];
         reader.read_exact(&mut compressed)?;
-        let mut decoder = ZlibDecoder::new(&compressed[..]);
-        let mut bytes = vec![0u8; uncompressed_size as usize];
-        decoder.read_exact(&mut bytes)?;
-        Ok((Cursor::new(bytes), uncompressed_size))
+        ZlibDecoder::new(&compressed[..]).read_exact(&mut bytes)?;
     }
+
+    Ok((Cursor::new(bytes), uncompressed_size))
 }

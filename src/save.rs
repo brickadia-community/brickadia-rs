@@ -184,7 +184,7 @@ impl BrickOwner {
         BrickOwner {
             name: user.name,
             id: user.id,
-            bricks: bricks,
+            bricks,
         }
     }
 }

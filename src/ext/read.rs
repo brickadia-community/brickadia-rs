@@ -152,8 +152,8 @@ pub trait BitReadExt: BitRead {
         self.read_bytes(&mut bytes)?;
 
         let mut value = 0i32;
-        for i in 0..4 {
-            value |= (bytes[i] as i32) << (8 * i);
+        for (i, &byte) in bytes.iter().enumerate() {
+            value |= (byte as i32) << (8 * i);
         }
         Ok(value)
     }
@@ -163,15 +163,15 @@ pub trait BitReadExt: BitRead {
         self.read_bytes(&mut bytes)?;
 
         let mut value = 0u16;
-        for i in 0..2 {
-            value |= (bytes[i] as u16) << (8 * i);
+        for (i, &byte) in bytes.iter().enumerate() {
+            value |= (byte as u16) << (8 * i);
         }
         Ok(value)
     }
 
     fn read_u16_le_into(&mut self, slice: &mut [u16]) -> Result<()> {
-        for i in 0..slice.len() {
-            slice[i] = self.read_u16_le()?;
+        for elem in slice {
+            *elem = self.read_u16_le()?;
         }
         Ok(())
     }
