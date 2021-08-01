@@ -1,17 +1,17 @@
-use std::{collections::HashMap};
+use std::collections::HashMap;
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use uuid::Uuid;
 
 #[cfg(feature = "serialize")]
 use {
-    std::fmt,
     serde::{
         de::{self, Visitor},
         ser::SerializeTuple,
         Deserialize, Deserializer, Serialize, Serializer,
     },
     serde_repr::{Deserialize_repr, Serialize_repr},
+    std::fmt,
 };
 
 use crate::SAVE_VERSION;
@@ -129,7 +129,7 @@ impl Default for Header2 {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum UnrealType {
     Class(String),
@@ -190,7 +190,7 @@ impl BrickOwner {
 }
 
 /// A color, in RGBA.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -335,7 +335,7 @@ impl Default for Brick {
 
 /// Represents a brick's direction.
 #[repr(u8)]
-#[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serialize", derive(Serialize_repr, Deserialize_repr))]
 pub enum Direction {
     XPositive,
@@ -348,7 +348,7 @@ pub enum Direction {
 
 /// Represents a brick's rotation.
 #[repr(u8)]
-#[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive)]
+#[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serialize", derive(Serialize_repr, Deserialize_repr))]
 pub enum Rotation {
     Deg0,
@@ -361,7 +361,7 @@ pub enum Rotation {
 ///
 /// Procedural bricks should use `Size::Procedural`.
 /// Static mesh bricks should use `Size::Empty`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Size {
     /// A singularity (used for non-procedural bricks).
     Empty,
@@ -427,7 +427,7 @@ impl<'de> Deserialize<'de> for Size {
 ///
 /// Bricks that refer to a color in their save should use `BrickColor::Index`.
 /// Bricks defining their own `Color` should use `BrickColor::Unique`.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum BrickColor {
     /// A color that links to an index in the save palette.
@@ -438,7 +438,7 @@ pub enum BrickColor {
 }
 
 /// Represents a brick's collision flags.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Collision {
     pub player: bool,
