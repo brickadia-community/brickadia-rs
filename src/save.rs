@@ -75,6 +75,7 @@ pub struct Header1 {
     pub host: Option<User>,
 
     /// The save time of the save.
+    #[cfg_attr(feature = "serialize", serde(skip))]
     pub save_time: [u8; 8],
 
     /// The number of bricks in the save.
