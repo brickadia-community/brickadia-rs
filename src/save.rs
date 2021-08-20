@@ -305,7 +305,7 @@ pub struct Brick {
     pub material_intensity: u32,
 
     /// The color of the brick. When referring to an index from the colors array in `Header2`, use `BrickColor::Index`. Otherwise, use `BrickColor::Unique(Color)`.
-    #[serde(serialize_with = "brick_color_serialize")]
+    #[cfg_attr(feature = "serialize", serde(serialize_with = "brick_color_serialize"))]
     pub color: BrickColor,
 
     /// The owner index of the brick. When 0, this brick's owner is PUBLIC. Otherwise, it refers to `Header2`'s `brick_owners`, 1-indexed.
@@ -315,6 +315,7 @@ pub struct Brick {
     pub components: HashMap<String, HashMap<String, UnrealType>>,
 }
 
+#[cfg(feature = "serialize")]
 fn brick_color_serialize<S: Serializer>(color: &BrickColor, s: S) -> Result<S::Ok, S::Error> {
     match color {
         BrickColor::Index(index) => s.serialize_u32(*index),
