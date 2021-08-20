@@ -18,7 +18,7 @@ use crate::SAVE_VERSION;
 
 /// Every part of a save file.
 #[derive(Debug)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct SaveData {
     /// The version of the save. Only relevant for reads; this automatically uses `SAVE_VERSION` when writing.
     pub version: u16,
@@ -60,7 +60,7 @@ impl Default for SaveData {
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Header1 {
     /// The map the save was saved on.
     pub map: String,
@@ -95,7 +95,7 @@ impl Default for Header1 {
 }
 
 #[derive(Debug)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Header2 {
     /// A list of mods, each a String.
     pub mods: Vec<String>,
@@ -141,7 +141,7 @@ pub enum UnrealType {
 }
 
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct User {
     /// The user's name.
     pub name: String,
@@ -271,7 +271,7 @@ impl Color {
 
 /// A brick.
 #[derive(Debug, Clone)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Brick {
     /// The asset name index of the brick, referring to `Header2`'s `brick_assets`.
     pub asset_name_index: u32,
@@ -439,7 +439,7 @@ pub enum BrickColor {
 
 /// Represents a brick's collision flags.
 #[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Collision {
     pub player: bool,
     pub weapon: bool,

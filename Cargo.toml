@@ -1,6 +1,6 @@
 [package]
 name = "brickadia"
-version = "0.1.5"
+version = "0.1.6"
 edition = "2018"
 authors = ["voximity"]
 description = "Save file reader/writer for Brickadia BRS saves"
