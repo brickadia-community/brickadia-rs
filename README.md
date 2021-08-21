@@ -17,6 +17,12 @@ and so on. It will also be maintained as the `.brs` spec continues to change in 
 By using the optional feature `serialize`, you can seamlessly serialize/deserialize into/from the
 [brs-js](https://github.com/brickadia-community/brs-js) JSON spec.
 
+#### Util module
+
+The optional feature `util` includes some utilities like getting brick size from brick asset, handling with
+rotations and orientations, and so on. It is enabled by default. To disable it, use `default_features = false`
+in your `Cargo.toml` dependency for `brickadia`, e.g. `brickadia = { version = "0.1", default_features = false }`.
+
 ## Installation
 
 Add the following to your `Cargo.toml`'s dependencies:
