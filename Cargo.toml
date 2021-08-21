@@ -1,6 +1,6 @@
 [package]
 name = "brickadia"
-version = "0.1.10"
+version = "0.1.11"
 edition = "2018"
 authors = ["voximity"]
 description = "Save file reader/writer for Brickadia BRS saves"
@@ -21,6 +21,6 @@ uuid = "0.8"
 serde_json = "1.0"
 
 [features]
-default_features = ["util"]
+default = ["util"]
 serialize = ["serde", "serde_repr", "uuid/serde"]
 util = []
