@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
 
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use uuid::Uuid;
@@ -191,7 +192,7 @@ impl BrickOwner {
 }
 
 /// A color, in RGBA.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Color {
     pub r: u8,
     pub g: u8,
@@ -349,6 +350,23 @@ impl Default for Brick {
     }
 }
 
+impl Hash for Brick {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.asset_name_index.hash(state);
+        self.size.hash(state);
+        self.position.hash(state);
+        self.direction.hash(state);
+        self.rotation.hash(state);
+        self.collision.hash(state);
+        self.visibility.hash(state);
+        self.material_index.hash(state);
+        self.physical_index.hash(state);
+        self.material_intensity.hash(state);
+        self.color.hash(state);
+        self.owner_index.hash(state);
+    }
+}
+
 /// Represents a brick's direction.
 #[repr(u8)]
 #[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -377,7 +395,7 @@ pub enum Rotation {
 ///
 /// Procedural bricks should use `Size::Procedural`.
 /// Static mesh bricks should use `Size::Empty`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Size {
     /// A singularity (used for non-procedural bricks).
     Empty,
@@ -443,7 +461,7 @@ impl<'de> Deserialize<'de> for Size {
 ///
 /// Bricks that refer to a color in their save should use `BrickColor::Index`.
 /// Bricks defining their own `Color` should use `BrickColor::Unique`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum BrickColor {
     /// A color that links to an index in the save palette.
@@ -454,7 +472,7 @@ pub enum BrickColor {
 }
 
 /// Represents a brick's collision flags.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Collision {
     pub player: bool,
