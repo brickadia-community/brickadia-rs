@@ -118,7 +118,7 @@ impl<W: Write> SaveWriter<W> {
                 self.writer.write_i32::<LittleEndian>(data.len() as i32)?;
                 self.writer.write_all(&data[..])?;
             }
-            None => self.writer.write_i32::<LittleEndian>(0)?,
+            None => self.writer.write_u8(0)?,
         };
         Ok(())
     }
