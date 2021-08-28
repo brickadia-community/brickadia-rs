@@ -2,7 +2,7 @@ use std::{
     cmp,
     collections::HashMap,
     convert::TryFrom,
-    io::{self, Cursor, Read, Seek, SeekFrom},
+    io::{self, Cursor, Read},
 };
 
 use bitstream_io::{BitRead, BitReader};
@@ -34,7 +34,7 @@ pub enum ReadError {
 }
 
 /// A save reader, which reads data from its `reader` (a `Read + Seek`).
-pub struct SaveReader<R: Read + Seek> {
+pub struct SaveReader<R: Read> {
     reader: R,
     pub version: u16,
     pub game_version: i32,
@@ -44,7 +44,7 @@ pub struct SaveReader<R: Read + Seek> {
     preview_read: bool,
 }
 
-impl<R: Read + Seek> SaveReader<R> {
+impl<R: Read> SaveReader<R> {
     /// Create a new save reader from an existing `reader`, a `Read + Seek`.
     pub fn new(mut reader: R) -> Result<Self, ReadError> {
         let mut magic = [0u8; 3];
@@ -203,8 +203,7 @@ impl<R: Read + Seek> SaveReader<R> {
 
     /// Read the preview in the save.
     ///
-    /// The preview is an `Option<Vec<u8>>`, as the save might not actually have
-    /// preview data.
+    /// The preview is an `Preview`, which might not exist (Preview::None).
     pub fn read_preview(&mut self) -> Result<Preview, ReadError> {
         if !self.header2_read {
             return Err(ReadError::BadSectionReadOrder);
@@ -214,14 +213,9 @@ impl<R: Read + Seek> SaveReader<R> {
             return Ok(Preview::None);
         }
 
-        if self.reader.read_u8()? != 0 {
-            let preview = Preview::from_reader(&mut self.reader)?;
-            self.preview_read = true;
-            Ok(preview)
-        } else {
-            self.preview_read = true;
-            Ok(Preview::None)
-        }
+        let preview = Preview::from_reader(&mut self.reader)?;
+        self.preview_read = true;
+        Ok(preview)
     }
 
     /// Skip over the preview section.
@@ -236,7 +230,7 @@ impl<R: Read + Seek> SaveReader<R> {
 
         if self.reader.read_u8()? != 0 {
             let len = self.reader.read_i32::<LittleEndian>()?;
-            self.reader.seek(SeekFrom::Current(len as i64))?;
+            io::copy(&mut self.reader.by_ref().take(len as u64), &mut io::sink())?;
         }
 
         self.preview_read = true;
