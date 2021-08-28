@@ -112,14 +112,17 @@ impl<W: Write> SaveWriter<W> {
 
     /// Writes the preview.
     pub fn write_preview(&mut self) -> Result<(), WriteError> {
-        match self.data.preview.clone() {
-            Some(data) => {
-                self.writer.write_u8(1)?;
-                self.writer.write_i32::<LittleEndian>(data.len() as i32)?;
-                self.writer.write_all(&data[..])?;
+        let preview = self.data.preview.clone();
+        let preview_type = preview.type_byte();
+        self.writer.write_u8(preview_type)?;
+        match preview_type {
+            0 => (),
+            _ => {
+                let bytes = preview.unwrap();
+                self.writer.write_i32::<LittleEndian>(bytes.len() as i32)?;
+                self.writer.write_all(&bytes)?
             }
-            None => self.writer.write_u8(0)?,
-        };
+        }
         Ok(())
     }
 

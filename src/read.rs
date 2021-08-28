@@ -205,24 +205,22 @@ impl<R: Read + Seek> SaveReader<R> {
     ///
     /// The preview is an `Option<Vec<u8>>`, as the save might not actually have
     /// preview data.
-    pub fn read_preview(&mut self) -> Result<Option<Vec<u8>>, ReadError> {
+    pub fn read_preview(&mut self) -> Result<Preview, ReadError> {
         if !self.header2_read {
             return Err(ReadError::BadSectionReadOrder);
         }
 
         if self.version < 8 {
-            return Ok(None);
+            return Ok(Preview::None);
         }
 
         if self.reader.read_u8()? != 0 {
-            let len = self.reader.read_i32::<LittleEndian>()?;
-            let mut vec = vec![0u8; len as usize];
-            self.reader.read_exact(&mut vec)?;
+            let preview = Preview::from_reader(&mut self.reader)?;
             self.preview_read = true;
-            Ok(Some(vec))
+            Ok(preview)
         } else {
             self.preview_read = true;
-            Ok(None)
+            Ok(Preview::None)
         }
     }
 
@@ -446,7 +444,7 @@ impl<R: Read + Seek> SaveReader<R> {
             game_version: self.game_version,
             header1,
             header2,
-            preview: None,
+            preview: Preview::None,
             bricks,
             components,
         })

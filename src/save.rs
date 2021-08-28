@@ -1,6 +1,8 @@
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
+use std::io::Read;
 
+use byteorder::{LittleEndian, ReadBytesExt};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
 use uuid::Uuid;
 
@@ -16,6 +18,7 @@ use {
 };
 
 use crate::SAVE_VERSION;
+use crate::read::ReadError;
 
 /// Every part of a save file.
 #[derive(Debug)]
@@ -37,7 +40,7 @@ pub struct SaveData {
 
     /// The preview of the save, if any.
     #[cfg_attr(feature = "serialize", serde(skip))]
-    pub preview: Option<Vec<u8>>,
+    pub preview: Preview,
 
     /// The bricks in the save.
     pub bricks: Vec<Brick>,
@@ -53,7 +56,7 @@ impl Default for SaveData {
             game_version: 0,
             header1: Header1::default(),
             header2: Header2::default(),
-            preview: None,
+            preview: Preview::None,
             bricks: vec![],
             components: HashMap::new(),
         }
@@ -128,6 +131,66 @@ impl Default for Header2 {
             brick_owners: vec![],
             physical_materials: vec!["BPMC_Default".into()],
         }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum Preview {
+    None,
+    PNG(Vec<u8>),
+    JPEG(Vec<u8>),
+    Unknown(u8, Vec<u8>),
+}
+
+impl Preview {
+    pub fn from_reader(r: &mut impl Read) -> Result<Self, ReadError> {
+        fn read_bytes(r: &mut impl Read) -> Result<Vec<u8>, ReadError> {
+            let len = r.read_i32::<LittleEndian>()?;
+            let mut vec = vec![0u8; len as usize];
+            r.read_exact(&mut vec)?;
+            Ok(vec)
+        }
+
+        let mode = r.read_u8()?;
+        Ok(match mode {
+            0 => Self::None,
+            1 => Self::PNG(read_bytes(r)?),
+            2 => Self::JPEG(read_bytes(r)?),
+            other => Self::Unknown(other, read_bytes(r)?),
+        })
+    }
+
+    pub fn type_byte(&self) -> u8 {
+        match self {
+            Preview::None => 0,
+            Preview::PNG(_) => 1,
+            Preview::JPEG(_) => 2,
+            Preview::Unknown(byte, _) => *byte,
+        }
+    }
+
+    pub fn into_bytes(self) -> Option<Vec<u8>> {
+        match self {
+            Preview::None => None,
+            Preview::PNG(bytes) => Some(bytes),
+            Preview::JPEG(bytes) => Some(bytes),
+            Preview::Unknown(_, bytes) => Some(bytes),
+        }
+    }
+
+    pub fn is_none(&self) -> bool {
+        match self {
+            Preview::None => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
+    }
+
+    pub fn unwrap(self) -> Vec<u8> {
+        self.into_bytes().unwrap()
     }
 }
 

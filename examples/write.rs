@@ -1,9 +1,6 @@
 use std::{env, fs::File};
 
-use brickadia::{
-    save::{Brick, BrickColor, BrickOwner, Color, SaveData, Size, User},
-    write::SaveWriter,
-};
+use brickadia::{save::{Brick, BrickColor, BrickOwner, Color, Preview, SaveData, Size, User}, write::SaveWriter};
 
 fn main() {
     let me = User {
@@ -25,7 +22,7 @@ fn main() {
 
     // set the preview image
     let preview_bytes = std::fs::read("examples/write_preview.png").unwrap();
-    save.preview = Some(preview_bytes);
+    save.preview = Preview::PNG(preview_bytes);
 
     // add some bricks
     for y in 0..10 {
