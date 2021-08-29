@@ -1,6 +1,9 @@
 use std::{env, fs::File};
 
-use brickadia::{save::{Brick, BrickColor, BrickOwner, Color, Preview, SaveData, Size, User}, write::SaveWriter};
+use brickadia::{
+    save::{Brick, BrickColor, BrickOwner, Color, Preview, SaveData, Size, User},
+    write::SaveWriter,
+};
 
 fn main() {
     let me = User {
@@ -44,8 +47,9 @@ fn main() {
     let save_location = env::args()
         .nth(1)
         .unwrap_or("examples/write.out.brs".into());
-    let mut writer = SaveWriter::new(File::create(save_location).unwrap(), save);
-    writer.write().unwrap();
+    SaveWriter::new(File::create(save_location).unwrap(), save)
+        .write()
+        .unwrap();
 
     println!("Save written");
 }

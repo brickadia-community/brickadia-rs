@@ -17,8 +17,8 @@ use {
     std::fmt,
 };
 
-use crate::SAVE_VERSION;
 use crate::read::ReadError;
+use crate::SAVE_VERSION;
 
 /// Every part of a save file.
 #[derive(Debug)]
