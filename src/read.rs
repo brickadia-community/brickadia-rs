@@ -70,6 +70,13 @@ impl<R: Read> SaveReader<R> {
         })
     }
 
+    /// Skip the first header.
+    pub fn skip_header1(&mut self) -> Result<(), ReadError> {
+        skip_compressed(&mut self.reader)?;
+        self.header1_read = true;
+        Ok(())
+    }
+
     /// Read the first header.
     pub fn read_header1(&mut self) -> Result<Header1, ReadError> {
         let (mut cursor, _) = read_compressed(&mut self.reader)?;
@@ -128,6 +135,13 @@ impl<R: Read> SaveReader<R> {
             save_time: save_time.unwrap_or([0u8; 8]),
             brick_count,
         })
+    }
+
+    /// Skip the second header.
+    pub fn skip_header2(&mut self) -> Result<(), ReadError> {
+        skip_compressed(&mut self.reader)?;
+        self.header2_read = true;
+        Ok(())
     }
 
     /// Read the second header.
@@ -468,4 +482,26 @@ fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), Rea
     }
 
     Ok((Cursor::new(bytes), uncompressed_size))
+}
+
+/// Read a compressed section from a `Read`, discarding its contents.
+fn skip_compressed(reader: &mut impl Read) -> Result<(), ReadError> {
+    let (uncompressed_size, compressed_size) = (
+        reader.read_i32::<LittleEndian>()?,
+        reader.read_i32::<LittleEndian>()?,
+    );
+    if uncompressed_size < 0 || compressed_size < 0 || compressed_size >= uncompressed_size {
+        return Err(ReadError::InvalidCompression);
+    }
+
+    io::copy(
+        &mut reader.take(if compressed_size == 0 {
+            uncompressed_size as u64
+        } else {
+            compressed_size as u64
+        }),
+        &mut io::sink(),
+    )?;
+
+    Ok(())
 }
