@@ -28,11 +28,16 @@ pub enum WriteError {
 pub struct SaveWriter<W: Write> {
     writer: W,
     data: SaveData,
+    compressed: bool,
 }
 
 impl<W: Write> SaveWriter<W> {
     pub fn new(writer: W, data: SaveData) -> SaveWriter<W> {
-        SaveWriter { writer, data }
+        SaveWriter { writer, data, compressed: true }
+    }
+
+    pub fn uncompressed(writer: W, data: SaveData) -> SaveWriter<W> {
+        SaveWriter { writer, data, compressed: false }
     }
 
     pub fn write(mut self) -> Result<(), WriteError> {
@@ -69,7 +74,7 @@ impl<W: Write> SaveWriter<W> {
             w.write_all(&self.data.header1.save_time)?;
             w.write_i32::<LittleEndian>(self.data.bricks.len() as i32)?;
 
-            write_compressed(&mut self.writer, w)?;
+            write_compressed(&mut self.writer, w, self.compressed)?;
         }
 
         // write header 2
@@ -107,7 +112,7 @@ impl<W: Write> SaveWriter<W> {
                 writer.write_string(string)
             })?;
 
-            write_compressed(&mut self.writer, w)?;
+            write_compressed(&mut self.writer, w, self.compressed)?;
         }
 
         // write preview
@@ -213,7 +218,7 @@ impl<W: Write> SaveWriter<W> {
 
             bits.byte_align()?;
 
-            write_compressed(&mut self.writer, vec)?;
+            write_compressed(&mut self.writer, vec, self.compressed)?;
 
             let mut vec: Vec<u8> = vec![];
             vec.write_i32::<LittleEndian>(self.data.components.len() as i32)?;
@@ -259,7 +264,7 @@ impl<W: Write> SaveWriter<W> {
                 vec = bits.into_writer();
             }
 
-            write_compressed(&mut self.writer, vec)?;
+            write_compressed(&mut self.writer, vec, self.compressed)?;
         }
 
         Ok(())
@@ -267,7 +272,14 @@ impl<W: Write> SaveWriter<W> {
 }
 
 /// Write a `Vec<u8>` out to a `Write`, following the BRS spec for compression.
-fn write_compressed(writer: &mut impl Write, vec: Vec<u8>) -> io::Result<()> {
+fn write_compressed(writer: &mut impl Write, vec: Vec<u8>, should_compress: bool) -> io::Result<()> {
+    if !should_compress {
+        writer.write_i32::<LittleEndian>(vec.len() as i32)?;
+        writer.write_i32::<LittleEndian>(0)?;
+        writer.write_all(&vec[..])?;
+        return Ok(());
+    }
+
     let compressed = ZlibEncoder::new(vec.clone(), Compression::default()).finish()?;
 
     writer.write_i32::<LittleEndian>(vec.len() as i32)?;
