@@ -60,10 +60,10 @@ fn main() {
 Below will create a 10x10 grid of bricks and save to `brickadia-rs.brs`.
 
 ```rs
-use std::fs;
+use std::{env, fs::File};
 
 use brickadia::{
-    save::{Brick, BrickColor, BrickOwner, Color, SaveData, Size, User},
+    save::{Brick, BrickColor, BrickOwner, Color, Preview, SaveData, Size, User},
     write::SaveWriter,
 };
 
@@ -87,7 +87,7 @@ fn main() {
 
     // set the preview image
     let preview_bytes = std::fs::read("examples/write_preview.png").unwrap();
-    save.preview = Some(preview_bytes);
+    save.preview = Preview::PNG(preview_bytes);
 
     // add some bricks
     for y in 0..10 {
@@ -97,8 +97,8 @@ fn main() {
             brick.size = Size::Procedural(5, 5, 6);
             brick.color = BrickColor::Unique(Color {
                 r: (x as f32 / 10.0 * 255.0) as u8,
-                g: (y as f32 / 10.0 * 255.0) as u8,
-                b: 255,
+                g: 255,
+                b: (y as f32 / 10.0 * 255.0) as u8,
                 a: 255,
             });
             save.bricks.push(brick);
@@ -106,10 +106,14 @@ fn main() {
     }
 
     // write out the save
-    let mut writer = SaveWriter::new(File::create("brickadia-rs.brs").unwrap(), save);
-    writer.write().unwrap();
+    let save_location = env::args()
+        .nth(1)
+        .unwrap_or("examples/write.out.brs".into());
+    SaveWriter::new(File::create(save_location).unwrap(), save)
+        .write()
+        .unwrap();
 
-    println!("Save written!");
+    println!("Save written");
 }
 ```
 
