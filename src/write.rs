@@ -226,7 +226,7 @@ impl<W: Write> SaveWriter<W> {
             for (name, component) in self.data.components.into_iter() {
                 vec.write_string(name.to_owned())?;
 
-                let mut bits = BitWriter::endian(vec, bitstream_io::LittleEndian);
+                let mut bits = BitWriter::endian(Vec::new(), bitstream_io::LittleEndian);
 
                 // write version
                 bits.write_i32(component.version)?;
@@ -261,7 +261,10 @@ impl<W: Write> SaveWriter<W> {
                 }
 
                 bits.byte_align()?;
-                vec = bits.into_writer();
+
+                let bit_vec = bits.into_writer();
+                vec.write_i32::<LittleEndian>(bit_vec.len() as i32)?;
+                vec.extend(bit_vec.into_iter());
             }
 
             write_compressed(&mut self.writer, vec, self.compressed)?;
