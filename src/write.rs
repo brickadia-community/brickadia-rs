@@ -250,6 +250,7 @@ impl<W: Write> SaveWriter<W> {
                 })?;
 
                 // read brick indices
+                // only continue if the component had some bricks
                 if let Some(brick_list) = component_bricks.remove(name.as_str()) {
                     for (_, mut props) in brick_list.into_iter() {
                         for (p, _) in properties.iter() {
@@ -258,13 +259,13 @@ impl<W: Write> SaveWriter<W> {
                             )?;
                         }
                     }
+
+                    bits.byte_align()?;
+    
+                    let bit_vec = bits.into_writer();
+                    vec.write_i32::<LittleEndian>(bit_vec.len() as i32)?;
+                    vec.extend(bit_vec.into_iter());
                 }
-
-                bits.byte_align()?;
-
-                let bit_vec = bits.into_writer();
-                vec.write_i32::<LittleEndian>(bit_vec.len() as i32)?;
-                vec.extend(bit_vec.into_iter());
             }
 
             write_compressed(&mut self.writer, vec, self.compressed)?;
