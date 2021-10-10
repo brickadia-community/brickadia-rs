@@ -391,19 +391,16 @@ impl<R: Read> SaveReader<R> {
                 let version = bits.read_i32_le()?;
                 let brick_indices = bits.read_array(|r| r.read_uint(brick_count as u32))?;
 
-                let mut property_names = vec![];
-                let mut properties = HashMap::new();
-                for _ in 0..bits.read_i32_le()? {
-                    let name = bits.read_string()?;
-                    property_names.push(name.clone());
-                    properties.insert(name, bits.read_string()?);
-                }
+                let properties = bits
+                    .read_array(|r| Ok((r.read_string()?, r.read_string()?)))?
+                    .into_iter()
+                    .collect::<HashMap<_, _>>();
 
                 // components for each brick
                 for &i in brick_indices.iter() {
                     let mut props = HashMap::new();
-                    for key in property_names.iter() {
-                        props.insert(key.clone(), bits.read_unreal_type(&properties[key][..])?);
+                    for (n, ty) in properties.iter() {
+                        props.insert(n.clone(), bits.read_unreal_type(&ty)?);
                     }
                     bricks[i as usize].components.insert(name.clone(), props);
                 }

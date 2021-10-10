@@ -18,10 +18,12 @@ use crate::{
 /// A write error.
 #[derive(Error, Debug)]
 pub enum WriteError {
-    #[error("generic io error")]
+    #[error("generic io error: {0}")]
     IoError(#[from] io::Error),
     #[error("brick is missing a component property")]
     ComponentBrickError,
+    #[error("brick specifies a component that is not described in the save data")]
+    BrickComponentMismatch,
 }
 
 /// A save writer, which writes its `data` to its `writer` (a `Write`).
@@ -33,11 +35,19 @@ pub struct SaveWriter<W: Write> {
 
 impl<W: Write> SaveWriter<W> {
     pub fn new(writer: W, data: SaveData) -> SaveWriter<W> {
-        SaveWriter { writer, data, compressed: true }
+        SaveWriter {
+            writer,
+            data,
+            compressed: true,
+        }
     }
 
     pub fn uncompressed(writer: W, data: SaveData) -> SaveWriter<W> {
-        SaveWriter { writer, data, compressed: false }
+        SaveWriter {
+            writer,
+            data,
+            compressed: false,
+        }
     }
 
     pub fn write(mut self) -> Result<(), WriteError> {
@@ -194,8 +204,7 @@ impl<W: Write> SaveWriter<W> {
                     }
                     BrickColor::Unique(color) => {
                         bits.write_bit(true)?;
-                        let bytes = [color.r, color.g, color.b];
-                        bits.write_bytes(&bytes)?;
+                        bits.write_bytes(&[color.r, color.g, color.b])?;
                     }
                 }
 
@@ -221,9 +230,14 @@ impl<W: Write> SaveWriter<W> {
             write_compressed(&mut self.writer, vec, self.compressed)?;
 
             let mut vec: Vec<u8> = vec![];
-            vec.write_i32::<LittleEndian>(self.data.components.len() as i32)?;
+            vec.write_i32::<LittleEndian>(component_bricks.len() as i32)?;
 
-            for (name, component) in self.data.components.into_iter() {
+            for (name, brick_list) in component_bricks.into_iter() {
+                let component = match self.data.components.remove(&name) {
+                    Some(c) => c,
+                    None => return Err(WriteError::BrickComponentMismatch),
+                };
+
                 vec.write_string(name.to_owned())?;
 
                 let mut bits = BitWriter::endian(Vec::new(), bitstream_io::LittleEndian);
@@ -232,13 +246,9 @@ impl<W: Write> SaveWriter<W> {
                 bits.write_i32(component.version)?;
 
                 // write brick indices
-                if let Some(brick_list) = component_bricks.get(name.as_str()) {
-                    bits.write_array(brick_list, |writer, (i, _)| {
-                        writer.write_uint(*i, cmp::max(brick_count as u32, 2))
-                    })?;
-                } else {
-                    bits.write_i32(0)?;
-                }
+                bits.write_array(&brick_list, |writer, (i, _)| {
+                    writer.write_uint(*i, cmp::max(brick_count as u32, 2))
+                })?;
 
                 // write properties
                 let properties = component.properties.into_iter().collect::<Vec<_>>();
@@ -251,21 +261,17 @@ impl<W: Write> SaveWriter<W> {
 
                 // read brick indices
                 // only continue if the component had some bricks
-                if let Some(brick_list) = component_bricks.remove(name.as_str()) {
-                    for (_, mut props) in brick_list.into_iter() {
-                        for (p, _) in properties.iter() {
-                            bits.write_unreal(
-                                props.remove(p).ok_or(WriteError::ComponentBrickError)?,
-                            )?;
-                        }
+                for (_, mut props) in brick_list.into_iter() {
+                    for (p, _) in properties.iter() {
+                        bits.write_unreal(props.remove(p).ok_or(WriteError::ComponentBrickError)?)?;
                     }
-
-                    bits.byte_align()?;
-    
-                    let bit_vec = bits.into_writer();
-                    vec.write_i32::<LittleEndian>(bit_vec.len() as i32)?;
-                    vec.extend(bit_vec.into_iter());
                 }
+
+                bits.byte_align()?;
+
+                let bit_vec = bits.into_writer();
+                vec.write_i32::<LittleEndian>(bit_vec.len() as i32)?;
+                vec.extend(bit_vec.into_iter());
             }
 
             write_compressed(&mut self.writer, vec, self.compressed)?;
@@ -276,7 +282,11 @@ impl<W: Write> SaveWriter<W> {
 }
 
 /// Write a `Vec<u8>` out to a `Write`, following the BRS spec for compression.
-fn write_compressed(writer: &mut impl Write, vec: Vec<u8>, should_compress: bool) -> io::Result<()> {
+fn write_compressed(
+    writer: &mut impl Write,
+    vec: Vec<u8>,
+    should_compress: bool,
+) -> io::Result<()> {
     if !should_compress {
         writer.write_i32::<LittleEndian>(vec.len() as i32)?;
         writer.write_i32::<LittleEndian>(0)?;
