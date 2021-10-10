@@ -4,6 +4,8 @@ version = "0.1.19"
 edition = "2018"
 authors = ["voximity"]
 description = "Save file reader/writer for Brickadia BRS saves"
+readme = "README.md"
+repository = "https://github.com/brickadia-community/brickadia-rs"
 license = "MIT"
 
 [dependencies]
