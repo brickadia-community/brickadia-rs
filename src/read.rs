@@ -19,7 +19,7 @@ lazy_static::lazy_static! {
 /// A read error.
 #[derive(Error, Debug)]
 pub enum ReadError {
-    #[error("generic io error")]
+    #[error("generic io error: {0}")]
     IoError(#[from] io::Error),
     #[error("bad magic bytes (expected 'BRS')")]
     BadHeader,
