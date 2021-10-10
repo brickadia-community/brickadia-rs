@@ -400,9 +400,9 @@ impl<R: Read> SaveReader<R> {
                 for &i in brick_indices.iter() {
                     let mut props = HashMap::new();
                     for (n, ty) in properties.iter() {
-                        props.insert(n.clone(), bits.read_unreal_type(&ty)?);
+                        props.insert(n.to_owned(), bits.read_unreal_type(ty)?);
                     }
-                    bricks[i as usize].components.insert(name.clone(), props);
+                    bricks[i as usize].components.insert(name.to_owned(), props);
                 }
 
                 components.insert(
