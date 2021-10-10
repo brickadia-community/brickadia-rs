@@ -264,7 +264,6 @@ impl<R: Read> SaveReader<R> {
         let (cursor, len) = read_compressed(&mut self.reader)?;
         let mut bits = BitReader::<_, bitstream_io::LittleEndian>::new(cursor);
 
-        let brick_count = header1.brick_count as usize;
         let brick_asset_count = cmp::max(header2.brick_assets.len(), 2);
         let material_count = cmp::max(header2.materials.len(), 2);
         let physical_material_count = cmp::max(header2.physical_materials.len(), 2);
@@ -276,7 +275,9 @@ impl<R: Read> SaveReader<R> {
         loop {
             // align and break out of the loop if we've seeked far enough ahead
             bits.byte_align();
-            if bricks.len() >= brick_count || bits.reader().unwrap().position() >= len as u64 {
+            if bricks.len() >= header1.brick_count as usize
+                || bits.reader().unwrap().position() >= len as u64
+            {
                 break;
             }
 
@@ -375,6 +376,8 @@ impl<R: Read> SaveReader<R> {
             bricks.push(brick);
         }
 
+        let brick_count = cmp::max(bricks.len(), 2);
+
         // components
         if self.version >= 8 {
             let (mut cursor, _) = read_compressed(&mut self.reader)?;
@@ -386,7 +389,7 @@ impl<R: Read> SaveReader<R> {
                 let mut bit_bytes = vec![0u8; cursor.read_i32::<LittleEndian>()? as usize];
                 cursor.read_exact(&mut bit_bytes)?;
                 let mut bits =
-                    BitReader::<_, bitstream_io::LittleEndian>::new(Cursor::new(bit_bytes));
+                    BitReader::endian(Cursor::new(bit_bytes), bitstream_io::LittleEndian);
 
                 let version = bits.read_i32_le()?;
                 let brick_indices = bits.read_array(|r| r.read_uint(brick_count as u32))?;
@@ -394,7 +397,7 @@ impl<R: Read> SaveReader<R> {
                 let properties = bits
                     .read_array(|r| Ok((r.read_string()?, r.read_string()?)))?
                     .into_iter()
-                    .collect::<HashMap<_, _>>();
+                    .collect::<Vec<_>>();
 
                 // components for each brick
                 for &i in brick_indices.iter() {
@@ -410,7 +413,7 @@ impl<R: Read> SaveReader<R> {
                     Component {
                         version,
                         brick_indices,
-                        properties,
+                        properties: properties.into_iter().collect(),
                     },
                 );
             }
