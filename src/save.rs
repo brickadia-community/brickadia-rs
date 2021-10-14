@@ -49,6 +49,14 @@ pub struct SaveData {
     pub components: HashMap<String, Component>,
 }
 
+impl SaveData {
+    /// Convert this `SaveData` into a `SaveOctree` for quick traversal of bricks in space.
+    #[cfg(feature = "util")]
+    pub fn into_octree(self) -> crate::util::octree::SaveOctree {
+        crate::util::octree::SaveOctree::new(self)
+    }
+}
+
 impl Default for SaveData {
     fn default() -> Self {
         SaveData {

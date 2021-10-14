@@ -23,6 +23,23 @@ The optional feature `util` includes some utilities like getting brick size from
 rotations and orientations, and so on. It is enabled by default. To disable it, use `default_features = false`
 in your `Cargo.toml` dependency for `brickadia`, e.g. `brickadia = { version = "0.1", default_features = false }`.
 
+#### Octree module
+
+Included in the `util` module is a module named `octree`, which adds an octree constructor and traversal object
+you can wrap around your `SaveData` that will allow you to quickly traverse through bricks in space. Here is
+some example usage:
+
+```rs
+// ... assume we have a `SaveData` named `save`
+let octree = SaveOctree::new(save); // or `save.into_octree();`
+
+// find the first brick that has a color of (0, 0) in the palette
+let base_brick = octree.data().bricks.iter().find(|b| b.color == BrickColor::Index(0)).unwrap();
+
+// fetch a list of bricks above it
+let bricks_above = octree.brick_side(base_brick, Direction::ZPositive);
+```
+
 ## Installation
 
 Add the following to your `Cargo.toml`'s dependencies:
@@ -120,5 +137,5 @@ fn main() {
 ## Credits
 
 * [voximity](https://github.com/voximity) - creator, maintainer
-* [Meshiest](https://github.com/Meshiest) - [brs-js](https://github.com/brickadia-community/brs-js) reference
+* [Meshiest](https://github.com/Meshiest) - [brs-js](https://github.com/brickadia-community/brs-js) reference, octree implementation from JS
 * [qoh](https://github.com/qoh) - [brs](https://github.com/brickadia/brs), original library
