@@ -206,6 +206,7 @@ impl Preview {
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum UnrealType {
     Class(String),
+    String(String),
     Boolean(bool),
     Float(f32),
     Color(Color),

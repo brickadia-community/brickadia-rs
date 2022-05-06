@@ -185,6 +185,7 @@ pub trait BitReadExt: BitRead {
     fn read_unreal_type(&mut self, t: &str) -> Result<UnrealType> {
         match t {
             "Class" | "Object" => Ok(UnrealType::Class(self.read_string()?)),
+            "String" => Ok(UnrealType::String(self.read_string()?)),
             "Boolean" => Ok(UnrealType::Boolean(self.read_i32_le()? != 0)),
             "Float" => Ok(UnrealType::Float(self.read_f32_le()?)),
             "Color" => {

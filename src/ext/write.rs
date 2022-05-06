@@ -178,6 +178,7 @@ pub trait BitWriteExt: BitWrite {
             UnrealType::Boolean(bool) => self.write_i32(if bool { 1 } else { 0 })?,
             UnrealType::Byte(byte) => self.write_bytes(&[byte])?,
             UnrealType::Class(str) => self.write_string(str)?,
+            UnrealType::String(str) => self.write_string(str)?,
             UnrealType::Color(color) => self.write_bytes(&[color.b, color.g, color.r, color.a])?,
             UnrealType::Float(float) => self.write_f32(float)?,
             UnrealType::Rotator(x, y, z) => {
