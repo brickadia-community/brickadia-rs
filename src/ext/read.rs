@@ -127,7 +127,7 @@ pub trait BitReadExt: BitRead {
                     .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "invalid string data"))
             }
             size if size < 0 => {
-                let size = -size;
+                let size = -size * 2;
                 match size % 2 {
                     0 => {
                         let mut chars = vec![0; (size / 2) as usize];
