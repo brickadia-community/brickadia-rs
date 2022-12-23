@@ -441,7 +441,9 @@ impl Hash for Brick {
 
 /// Represents a brick's direction.
 #[repr(u8)]
-#[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Copy, Clone, IntoPrimitive, TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 #[cfg_attr(feature = "serialize", derive(Serialize_repr, Deserialize_repr))]
 pub enum Direction {
     XPositive,
@@ -454,7 +456,9 @@ pub enum Direction {
 
 /// Represents a brick's rotation.
 #[repr(u8)]
-#[derive(Debug, Clone, IntoPrimitive, TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(
+    Debug, Copy, Clone, IntoPrimitive, TryFromPrimitive, PartialEq, Eq, PartialOrd, Ord, Hash,
+)]
 #[cfg_attr(feature = "serialize", derive(Serialize_repr, Deserialize_repr))]
 pub enum Rotation {
     Deg0,
