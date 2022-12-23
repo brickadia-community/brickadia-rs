@@ -21,7 +21,7 @@ use crate::read::ReadError;
 use crate::SAVE_VERSION;
 
 /// Every part of a save file.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct SaveData {
     /// The version of the save. Only relevant for reads; this automatically uses `SAVE_VERSION` when writing.
@@ -71,7 +71,7 @@ impl Default for SaveData {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Header1 {
     /// The map the save was saved on.
@@ -107,7 +107,7 @@ impl Default for Header1 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Header2 {
     /// A list of mods, each a String.

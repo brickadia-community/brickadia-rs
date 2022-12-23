@@ -17,22 +17,16 @@ pub trait WriteExt: Write {
         if string.is_ascii() {
             // write utf-8: positive length
             self.write_i32::<LittleEndian>(string.len() as i32 + 1)?;
-            for c in string.chars() {
-                self.write_u8(c as u8)?;
-            }
+            self.write(string.as_bytes())?;
             self.write_u8(0)?; // write a null terminator
-
             Ok(())
         } else {
             // write ucs-2: negative length
-            let utf16 = string.encode_utf16();
-            let len = -((utf16.clone().count() as i32 + 1) * 2);
-            self.write_i32::<LittleEndian>(len)?;
-            for c in utf16 {
-                self.write_u16::<LittleEndian>(c)?;
-            }
+            self.write_i32::<LittleEndian>(-(string.len() as i32))?;
+            string
+                .encode_utf16()
+                .try_for_each(|c| self.write_u16::<LittleEndian>(c))?;
             self.write_u8(0)?; // write a null terminator
-
             Ok(())
         }
     }
@@ -84,25 +78,22 @@ pub trait BitWriteExt: BitWrite {
     }
 
     fn write_string(&mut self, string: String) -> io::Result<()> {
+        if string.is_empty() {
+            self.write_i32(0)?;
+            return Ok(());
+        }
+
         if string.is_ascii() {
             // write utf-8: positive length
             self.write_i32(string.len() as i32 + 1)?;
-            for c in string.chars() {
-                self.write_bytes(&[c as u8])?;
-            }
+            self.write_bytes(string.as_bytes())?;
             self.write_bytes(&[0])?; // write a null terminator
-
             Ok(())
         } else {
             // write ucs-2: negative length
-            let utf16 = string.encode_utf16();
-            let len = -((utf16.clone().count() as i32 + 1) * 2);
-            self.write_i32(len)?;
-            for c in utf16 {
-                self.write_u16(c)?;
-            }
+            self.write_i32(-(string.len() as i32))?;
+            string.encode_utf16().try_for_each(|c| self.write_u16(c))?;
             self.write_bytes(&[0])?; // write a null terminator
-
             Ok(())
         }
     }
