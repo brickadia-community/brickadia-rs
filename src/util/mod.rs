@@ -1,3 +1,5 @@
+//! Utility methods and types for dealing with save files.
+
 pub mod octree;
 
 use std::collections::HashMap;
@@ -65,6 +67,7 @@ pub const TRANSLATION_TABLE: [(i8, i8, i8); 24] = [
 ];
 
 lazy_static! {
+    /// A list of default materials.
     pub static ref DEFAULT_MATERIALS: Vec<&'static str> = vec![
         "BMC_Hidden",
         "BMC_Ghost",
@@ -75,6 +78,10 @@ lazy_static! {
         "BMC_Metallic",
         "BMC_Hologram",
     ];
+    /// A map from brick asset name to actual brick size.
+    ///
+    /// As [`Size::Empty`](crate::save::Size::Empty) is used to represent static mesh bricks,
+    /// this can be used to look up the true size of a brick by its asset name.
     pub static ref BRICK_SIZE_MAP: HashMap<&'static str, (u32, u32, u32)> = vec![
         ("B_1x1_Brick_Side", (5, 5, 6)),
         ("B_1x1_Brick_Side_Lip", (5, 5, 6)),
@@ -230,15 +237,21 @@ pub fn get_axis_size(brick: &Brick, assets: &[String], axis: u8) -> u32 {
     }
 }
 
+/// Rotation helper methods.
 pub mod rotation {
+    /// Convert a direction and a rotation to its orientation number.
+    ///
+    /// Equivalent to `(direction << 2) | rotation`.
     pub fn d2o(direction: u8, rotation: u8) -> u8 {
         (direction << 2) | rotation
     }
 
+    /// Convert an orientation back to its direction and rotation.
     pub fn o2d(orientation: u8) -> (u8, u8) {
-        ((orientation >> 2) % 6, orientation % 3)
+        ((orientation >> 2) % 6, orientation & 3)
     }
 
+    /// Rotate orientation A (`ad` and `ar`) by orientation B (`bd` and `br`).
     pub fn rotate_direction((ad, ar): (u8, u8), (bd, br): (u8, u8)) -> (u8, u8) {
         o2d(super::ROTATION_TABLE[(d2o(ad, ar) * 24 + d2o(bd, br)) as usize])
     }

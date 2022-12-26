@@ -1,3 +1,8 @@
+//! Octree implementation for performing spatial lookups on bricks.
+//!
+//! Generally, you will want to use a [`SaveOctree`](SaveOctree),
+//! not other exposed items from this module.
+
 use std::cmp;
 use std::collections::HashSet;
 use std::fmt::Display;
@@ -7,6 +12,7 @@ use crate::save::{Brick, Direction, SaveData};
 
 use super::get_axis_size;
 
+/// The size, in units, of an octree chunk.
 pub const CHUNK_SIZE: i32 = 1024;
 pub const RIGHT: i32 = 1;
 pub const BACK: i32 = 2;
@@ -259,21 +265,25 @@ impl<T: PartialEq + Eq + Hash + Copy> Node<T> {
     }
 }
 
+/// A series of chunks.
 pub struct ChunkTree<T: PartialEq + Eq + Hash + Copy> {
     pub chunks: Vec<(Node<T>, Point)>,
 }
 
 impl<T: PartialEq + Eq + Hash + Copy> ChunkTree<T> {
+    /// Instantiate an empty chunk tree.
     pub fn new() -> Self {
         ChunkTree { chunks: vec![] }
     }
 
+    /// Reduce all child trees.
     pub fn reduce(&mut self) {
         for (node, _) in self.chunks.iter_mut() {
             node.reduce();
         }
     }
 
+    /// Get a list of chunks contained by a `min` and a `max`.
     pub fn chunks_from_bounds(&self, min: Point, max: Point) -> Vec<(Point, Point)> {
         let min_chunk = min.chunk();
         let max_chunk = max.shifted(-1, -1, -1).chunk();
@@ -329,6 +339,7 @@ impl<T: PartialEq + Eq + Hash + Copy> ChunkTree<T> {
         }
     }
 
+    /// Get a reference to chunk at `point`, if it exists.
     pub fn chunk_at(&self, point: Point) -> Option<&Node<T>> {
         let chunk_pos = point.chunk();
         self.chunks
@@ -337,6 +348,7 @@ impl<T: PartialEq + Eq + Hash + Copy> ChunkTree<T> {
             .map(|(node, _)| node)
     }
 
+    /// Get a mutable reference to the chunk at `point`, if it exists.
     pub fn chunk_at_mut(&mut self, point: Point) -> Option<&mut Node<T>> {
         let chunk_pos = point.chunk();
         self.chunks
@@ -345,6 +357,7 @@ impl<T: PartialEq + Eq + Hash + Copy> ChunkTree<T> {
             .map(|(node, _)| node)
     }
 
+    /// Search for `T`s contained within `min_bound` and `max_bound`.
     pub fn search(&self, min_bound: Point, max_bound: Point) -> HashSet<T> {
         let mut set = HashSet::new();
         for (min, max) in self.chunks_from_bounds(min_bound, max_bound).into_iter() {
@@ -355,10 +368,12 @@ impl<T: PartialEq + Eq + Hash + Copy> ChunkTree<T> {
         set
     }
 
-    pub fn get(&self, point: Point) -> Option<Option<&T>> {
-        self.chunk_at(point).map(|node| node.get(point))
+    /// Get the `T` at exactly `point`.
+    pub fn get(&self, point: Point) -> Option<&T> {
+        self.chunk_at(point).and_then(|node| node.get(point))
     }
 
+    /// Insert a `T` into the chunks, from `min_bound` to `max_bound`.
     pub fn insert(&mut self, value: T, min_bound: Point, max_bound: Point) {
         for (min, max) in self.chunks_from_bounds(min_bound, max_bound).into_iter() {
             match self.chunk_at_mut(min) {
@@ -376,7 +391,9 @@ impl<T: PartialEq + Eq + Hash + Copy> ChunkTree<T> {
 
 /// A wrapper around some save data to fetch bricks quickly.
 pub struct SaveOctree {
+    /// The save data.
     data: SaveData,
+    /// The chunks in the octree.
     tree: ChunkTree<usize>,
 }
 
@@ -396,9 +413,11 @@ impl SaveOctree {
         tree
     }
 
-    /// Take a reference to the inner `SaveData`. This cannot be mutable as the octree
-    /// would have to rebuild. If you need to alter the SaveData and traverse again,
-    /// instead use `into_inner()` to take out the `SaveData`, make your changes,
+    /// Take a reference to the inner `SaveData`.
+    ///
+    /// This cannot be mutable as the octree would have to rebuild.
+    /// If you need to alter the SaveData and traverse again, instead use
+    /// `into_inner()` to take out the `SaveData`, make your changes,
     /// and reconstruct with `new(SaveData)`.
     pub fn data(&self) -> &SaveData {
         &self.data

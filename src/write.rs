@@ -1,3 +1,5 @@
+//! Save writing.
+
 use std::{
     cmp,
     collections::{hash_map::Entry, HashMap},
@@ -10,7 +12,7 @@ use flate2::{write::ZlibEncoder, Compression};
 use thiserror::Error;
 
 use crate::{
-    ext::write::*,
+    ext::*,
     save::{BrickColor, SaveData, Size, UnrealType},
     MAGIC_BYTES, SAVE_VERSION,
 };
@@ -53,7 +55,7 @@ impl<W: Write> SaveWriter<W> {
     pub fn write(mut self) -> Result<(), WriteError> {
         // write header 0
         {
-            self.writer.write_all(&MAGIC_BYTES)?;
+            self.writer.write_all(MAGIC_BYTES)?;
             self.writer.write_u16::<LittleEndian>(SAVE_VERSION)?;
             self.writer
                 .write_i32::<LittleEndian>(self.data.game_version)?;

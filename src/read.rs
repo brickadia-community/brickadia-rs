@@ -1,3 +1,5 @@
+//! Save reading.
+
 use std::{
     cmp,
     collections::HashMap,
@@ -10,7 +12,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 use flate2::read::ZlibDecoder;
 use thiserror::Error;
 
-use crate::{ext::read::*, save::*, MAGIC_BYTES};
+use crate::{ext::*, save::*, MAGIC_BYTES};
 
 lazy_static::lazy_static! {
     static ref DEFAULT_MATERIALS: Vec<String> = vec!["BMC_Hologram", "BMC_Plastic", "BMC_Glow", "BMC_Metallic", "BMC_Glass"].into_iter().map(|s| s.into()).collect();
@@ -49,7 +51,7 @@ impl<R: Read> SaveReader<R> {
     pub fn new(mut reader: R) -> Result<Self, ReadError> {
         let mut magic = [0u8; 3];
         reader.read_exact(&mut magic)?;
-        if magic != MAGIC_BYTES {
+        if &magic != MAGIC_BYTES {
             return Err(ReadError::BadHeader);
         }
 

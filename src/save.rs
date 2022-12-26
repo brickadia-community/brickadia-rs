@@ -1,3 +1,5 @@
+//! General save file types and helpers.
+
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
 use std::io::Read;
@@ -20,11 +22,17 @@ use {
 use crate::read::ReadError;
 use crate::SAVE_VERSION;
 
-/// Every part of a save file.
+/// An entire save file.
+///
+/// Represents data that can be written out with a [`SaveWriter`], or read with a [`SaveReader`].
+/// Composed of its [`Header1`](Header1), [`Header2`](Header2), and more information.
+///
+/// [`SaveWriter`]: crate::write::SaveWriter
+/// [`SaveReader`]: crate::read::SaveReader
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct SaveData {
-    /// The version of the save. Only relevant for reads; this automatically uses `SAVE_VERSION` when writing.
+    /// The version of the save. Only relevant for reads; this automatically uses [`SAVE_VERSION`](crate::SAVE_VERSION) when writing.
     pub version: u16,
 
     /// The game version the save was saved on.
@@ -71,6 +79,7 @@ impl Default for SaveData {
     }
 }
 
+/// The first header in a save file. Contains basic save information.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Header1 {
@@ -107,6 +116,7 @@ impl Default for Header1 {
     }
 }
 
+/// The second header in a save file. Contains universal brick metadata.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Header2 {
@@ -125,7 +135,7 @@ pub struct Header2 {
     /// A list of brick owners.
     pub brick_owners: Vec<BrickOwner>,
 
-    /// A list of physical materials. Empty if save version is
+    /// A list of physical materials. Possibly empty, if the game version is too old.
     pub physical_materials: Vec<String>,
 }
 
@@ -142,15 +152,25 @@ impl Default for Header2 {
     }
 }
 
+/// An image preview embedded in a save, represented by its bytes.
 #[derive(Debug, Clone)]
 pub enum Preview {
+    /// No preview.
     None,
+    /// A PNG preview.
     PNG(Vec<u8>),
+    /// A JPEG preview.
     JPEG(Vec<u8>),
-    Unknown(u8, Vec<u8>),
+    /// An unknown preview type.
+    Unknown(
+        /// The type byte of this unknown preview type.
+        u8,
+        Vec<u8>,
+    ),
 }
 
 impl Preview {
+    /// Create a `Preview` from a reader.
     pub fn from_reader(r: &mut impl Read) -> Result<Self, ReadError> {
         fn read_bytes(r: &mut impl Read) -> Result<Vec<u8>, ReadError> {
             let len = r.read_i32::<LittleEndian>()?;
@@ -177,6 +197,7 @@ impl Preview {
         }
     }
 
+    /// Consume the `Preview`, extracting its bytes, or `None` if no preview was set.
     pub fn into_bytes(self) -> Option<Vec<u8>> {
         match self {
             Preview::None => None,
@@ -186,6 +207,7 @@ impl Preview {
         }
     }
 
+    /// Whether or not the `Preview` was unset.
     pub fn is_none(&self) -> bool {
         match self {
             Preview::None => true,
@@ -193,15 +215,18 @@ impl Preview {
         }
     }
 
+    /// Whether or not the `Preview` was set.
     pub fn is_some(&self) -> bool {
         !self.is_none()
     }
 
+    /// Equivalent to `.into_bytes().unwrap()`. Panics if no bytes are set (the preview was unset).
     pub fn unwrap(self) -> Vec<u8> {
         self.into_bytes().unwrap()
     }
 }
 
+/// An Unreal type, used as values to fields in components.
 #[derive(Debug, Clone, PartialEq)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum UnrealType {
@@ -214,6 +239,7 @@ pub enum UnrealType {
     Rotator(f32, f32, f32),
 }
 
+/// A user.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct User {
@@ -233,13 +259,15 @@ impl Default for User {
     }
 }
 
-/// A brick owner. Similar to a user, but stores an u32 representing bricks in save.
+/// A brick owner. Similar to a [`User`](User), but stores a `u32` representing bricks in save.
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct BrickOwner {
     /// The brick owner's name.
     pub name: String,
+    /// The owner's ID.
     pub id: Uuid,
+    /// The amount of bricks placed by the owner.
     pub bricks: u32,
 }
 
@@ -422,6 +450,7 @@ impl Default for Brick {
     }
 }
 
+// Manual Hash impl necessary as `HashMap` is not `Hash`.
 impl Hash for Brick {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.asset_name_index.hash(state);
@@ -468,12 +497,9 @@ pub enum Rotation {
 }
 
 /// Represents a storable brick size.
-///
-/// Procedural bricks should use `Size::Procedural`.
-/// Static mesh bricks should use `Size::Empty`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Size {
-    /// A singularity (used for non-procedural bricks).
+    /// A singularity (used for non-procedural, static-mesh bricks).
     Empty,
 
     /// A brick that is procedural.
@@ -534,9 +560,6 @@ impl<'de> Deserialize<'de> for Size {
 }
 
 /// Represents a brick's color.
-///
-/// Bricks that refer to a color in their save should use `BrickColor::Index`.
-/// Bricks defining their own `Color` should use `BrickColor::Unique`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(untagged))]
 pub enum BrickColor {
@@ -551,13 +574,20 @@ pub enum BrickColor {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize), serde(default))]
 pub struct Collision {
+    /// Whether or not players collide with the brick.
     pub player: bool,
+    /// Whether or not bullets, slashes, and other projectiles collide with the brick.
     pub weapon: bool,
+    /// Whether or not player interactions collide with the brick.
     pub interaction: bool,
+    /// Whether or not the brick can be considered in tool clicks.
+    ///
+    /// When false, this brick cannot be removed with the hammer, painted, etc.
     pub tool: bool,
 }
 
 impl Collision {
+    /// Create a `Collision` with all flags set to `state`.
     pub fn for_all(state: bool) -> Self {
         Collision {
             player: state,
@@ -574,16 +604,29 @@ impl Default for Collision {
     }
 }
 
-/// A component.
+/// A brick component.
+///
+/// ### Known component names
+///
+/// Below are a list of known component names as keys to `properties`.
+///
+/// * `BCD_SpotLight`
+/// * `BCD_PointLight`
+/// * `BCD_ItemSpawn`
+/// * `BCD_Interact`
+/// * `BCD_AudioEmitter`
 #[derive(Debug, Clone)]
 #[cfg_attr(feature = "serialize", derive(Serialize, Deserialize))]
 pub struct Component {
+    /// The version of this component.
     pub version: i32,
 
     /// The indices of bricks this component is on.
     pub brick_indices: Vec<u32>,
 
     /// A map from property name to Unreal type (see `UnrealType`).
+    ///
+    /// See above for a list of known component names to use as keys to this map.
     pub properties: HashMap<String, String>,
 }
 
