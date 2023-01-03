@@ -467,7 +467,7 @@ fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), Rea
         reader.read_i32::<LittleEndian>()?,
         reader.read_i32::<LittleEndian>()?,
     );
-    if uncompressed_size < 0 || compressed_size < 0 || compressed_size >= uncompressed_size {
+    if uncompressed_size < 0 || compressed_size < 0 || compressed_size > uncompressed_size {
         return Err(ReadError::InvalidCompression);
     }
 
@@ -492,7 +492,7 @@ fn skip_compressed(reader: &mut impl Read) -> Result<(), ReadError> {
         reader.read_i32::<LittleEndian>()?,
         reader.read_i32::<LittleEndian>()?,
     );
-    if uncompressed_size < 0 || compressed_size < 0 || compressed_size >= uncompressed_size {
+    if uncompressed_size < 0 || compressed_size < 0 || compressed_size > uncompressed_size {
         return Err(ReadError::InvalidCompression);
     }
 
