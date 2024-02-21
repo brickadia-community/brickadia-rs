@@ -270,7 +270,8 @@ impl<R: Read> SaveReader<R> {
         let material_count = cmp::max(header2.materials.len(), 2);
         let physical_material_count = cmp::max(header2.physical_materials.len(), 2);
 
-        let mut bricks = Vec::with_capacity(header1.brick_count as usize);
+        let inital_bricks_capacity = cmp::min(header1.brick_count as usize, 10_000_000);
+        let mut bricks = Vec::with_capacity(initial_brick_alloc);
         let mut components = HashMap::new();
 
         // loop over each brick
@@ -379,6 +380,11 @@ impl<R: Read> SaveReader<R> {
         }
 
         let brick_count = cmp::max(bricks.len(), 2);
+
+        // if we read a different amount of bricks than stated in header, correct possible overallocation
+        if bricks.len() != header1.brick_count as usize {
+            bricks.shrink_to_fit();
+        }
 
         // components
         if self.version >= 8 {
