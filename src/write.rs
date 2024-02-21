@@ -143,7 +143,7 @@ impl<W: Write> SaveWriter<W> {
 
         // write bricks and components
         {
-            let mut vec = vec![];
+            let mut vec = Vec::with_capacity(self.data.bricks.len() * 8);
             let mut bits = BitWriter::endian(&mut vec, bitstream_io::LittleEndian);
 
             let mut component_bricks: HashMap<String, Vec<(u32, HashMap<String, UnrealType>)>> =
