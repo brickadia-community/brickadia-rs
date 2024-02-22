@@ -2,6 +2,7 @@
 //! [writing](crate::write::SaveWriter) [Brickadia](https://brickadia.com/)
 //! [save files](crate::save::SaveData).
 
+#[allow(clippy::type_complexity)]
 mod ext;
 pub mod read;
 pub mod save;

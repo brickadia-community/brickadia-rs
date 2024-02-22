@@ -190,7 +190,7 @@ pub fn get_brick_size(brick: &Brick, assets: &[String]) -> (u32, u32, u32) {
     assets
         .get(brick.asset_name_index as usize)
         .and_then(|a| BRICK_SIZE_MAP.get(a.as_str()))
-        .map(|s| *s)
+        .copied()
         .unwrap_or((0, 0, 0))
 }
 

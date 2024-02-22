@@ -266,6 +266,7 @@ impl<T: PartialEq + Eq + Hash + Copy> Node<T> {
 }
 
 /// A series of chunks.
+#[derive(Default)]
 pub struct ChunkTree<T: PartialEq + Eq + Hash + Copy> {
     pub chunks: Vec<(Node<T>, Point)>,
 }

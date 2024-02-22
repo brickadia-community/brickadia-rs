@@ -30,16 +30,17 @@ fn main() {
     // add some bricks
     for y in 0..10 {
         for x in 0..10 {
-            let mut brick = Brick::default();
-            brick.position = (x * 10, y * 10, 10);
-            brick.size = Size::Procedural(5, 5, 6);
-            brick.color = BrickColor::Unique(Color {
-                r: (x as f32 / 10.0 * 255.0) as u8,
-                g: 255,
-                b: (y as f32 / 10.0 * 255.0) as u8,
-                a: 255,
+            save.bricks.push(Brick {
+                position: (x * 10, y * 10, 10),
+                size: Size::Procedural(5, 5, 6),
+                color: BrickColor::Unique(Color {
+                    r: (x as f32 / 10.0 * 255.0) as u8,
+                    g: 255,
+                    b: (y as f32 / 10.0 * 255.0) as u8,
+                    a: 255,
+                }),
+                ..Default::default()
             });
-            save.bricks.push(brick);
         }
     }
 

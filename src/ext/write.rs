@@ -17,7 +17,7 @@ pub trait WriteExt: Write {
         if string.is_ascii() {
             // write utf-8: positive length
             self.write_i32::<LittleEndian>(string.len() as i32 + 1)?;
-            self.write(string.as_bytes())?;
+            self.write_all(string.as_bytes())?;
             self.write_u8(0)?; // write a null terminator
             Ok(())
         } else {
@@ -140,7 +140,7 @@ pub trait BitWriteExt: BitWrite {
     }
 
     fn write_int_packed(&mut self, value: i32) -> io::Result<()> {
-        self.write_uint_packed(((value.abs() as u32) << 1) | if value >= 0 { 1 } else { 0 })
+        self.write_uint_packed((value.unsigned_abs() << 1) | if value >= 0 { 1 } else { 0 })
     }
 
     fn write_f32(&mut self, value: f32) -> io::Result<()> {

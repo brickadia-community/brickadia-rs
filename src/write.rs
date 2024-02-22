@@ -151,8 +151,8 @@ impl<W: Write> SaveWriter<W> {
             let mut vec = Vec::with_capacity(self.data.bricks.len() * NAIVE_BYTES_PER_BRICK);
             let mut bits = BitWriter::endian(&mut vec, bitstream_io::LittleEndian);
 
-            let mut component_bricks: HashMap<String, Vec<(u32, HashMap<String, UnrealType>)>> =
-                HashMap::new();
+            type ComponentBricks = Vec<(u32, HashMap<String, UnrealType>)>;
+            let mut component_bricks: HashMap<String, ComponentBricks> = HashMap::new();
 
             for (i, brick) in self.data.bricks.into_iter().enumerate() {
                 bits.byte_align()?;

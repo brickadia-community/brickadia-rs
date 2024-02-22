@@ -209,10 +209,7 @@ impl Preview {
 
     /// Whether or not the `Preview` was unset.
     pub fn is_none(&self) -> bool {
-        match self {
-            Preview::None => true,
-            _ => false,
-        }
+        matches!(self, Preview::None)
     }
 
     /// Whether or not the `Preview` was set.
