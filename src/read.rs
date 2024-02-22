@@ -379,12 +379,8 @@ impl<R: Read> SaveReader<R> {
             bricks.push(brick);
         }
 
+        bricks.shrink_to_fit();
         let brick_count = cmp::max(bricks.len(), 2);
-
-        // if we read a different amount of bricks than stated in header, correct possible overallocation
-        if bricks.len() != header1.brick_count as usize {
-            bricks.shrink_to_fit();
-        }
 
         // components
         if self.version >= 8 {
