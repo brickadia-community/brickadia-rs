@@ -270,7 +270,8 @@ impl<R: Read> SaveReader<R> {
         let material_count = cmp::max(header2.materials.len(), 2);
         let physical_material_count = cmp::max(header2.physical_materials.len(), 2);
 
-        let mut bricks = vec![];
+        let inital_bricks_capacity = cmp::min(header1.brick_count as usize, 10_000_000);
+        let mut bricks = Vec::with_capacity(inital_bricks_capacity);
         let mut components = HashMap::new();
 
         // loop over each brick
@@ -378,6 +379,7 @@ impl<R: Read> SaveReader<R> {
             bricks.push(brick);
         }
 
+        bricks.shrink_to_fit();
         let brick_count = cmp::max(bricks.len(), 2);
 
         // components

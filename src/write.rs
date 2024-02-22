@@ -17,6 +17,11 @@ use crate::{
     MAGIC_BYTES, SAVE_VERSION,
 };
 
+// bytes per brick used for initial allocation for brick bit vector
+// this is based on the minimum bits required to store a brick
+// the minimum bits required is 52, but we round up to 64 for reduced allocations in realistic cases
+const NAIVE_BYTES_PER_BRICK: usize = 8;
+
 /// A write error.
 #[derive(Error, Debug)]
 pub enum WriteError {
@@ -143,7 +148,7 @@ impl<W: Write> SaveWriter<W> {
 
         // write bricks and components
         {
-            let mut vec = vec![];
+            let mut vec = Vec::with_capacity(self.data.bricks.len() * NAIVE_BYTES_PER_BRICK);
             let mut bits = BitWriter::endian(&mut vec, bitstream_io::LittleEndian);
 
             let mut component_bricks: HashMap<String, Vec<(u32, HashMap<String, UnrealType>)>> =
