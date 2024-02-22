@@ -17,6 +17,16 @@ and so on. It will also be maintained as the `.brs` spec continues to change in 
 By using the optional feature `serialize`, you can seamlessly serialize/deserialize into/from the
 [brs-js](https://github.com/brickadia-community/brs-js) JSON spec.
 
+#### Compression backends
+
+By default, `brickadia-rs` uses [`flate2`](https://crates.io/crates/flate2)'s default compression backend,
+`miniz_oxide`, which has the benefit of being pure Rust. If you are looking for extra performance, use
+the `zlib-ng` feature of this crate to use that backend instead:
+
+```toml
+brickadia = { version = "0.1", default_features = false, features = ["util", "zlib-ng"] }
+```
+
 #### Util module
 
 The optional feature `util` includes some utilities like getting brick size from brick asset, handling with

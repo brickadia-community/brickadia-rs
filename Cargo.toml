@@ -1,6 +1,6 @@
 [package]
 name = "brickadia"
-version = "0.1.31"
+version = "0.1.32"
 edition = "2021"
 authors = ["voximity"]
 description = "Save file reader/writer for Brickadia BRS saves"
@@ -11,7 +11,7 @@ license = "MIT"
 [dependencies]
 bitstream-io = "1.1.0"
 byteorder = "1.4.3"
-flate2 = "1.0"
+flate2 = { version = "1.0", default_features = false }
 lazy_static = "1.4.0"
 num_enum = "0.5.1"
 serde = { version = "1.0", features = ["derive"], optional = true }
@@ -23,6 +23,7 @@ uuid = "0.8"
 serde_json = "1.0"
 
 [features]
-default = ["util"]
+default = ["util", "flate2/default"]
 serialize = ["serde", "serde_repr", "uuid/serde"]
+zlib-ng = ["flate2/zlib-ng"]
 util = []
