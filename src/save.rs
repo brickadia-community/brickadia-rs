@@ -5,9 +5,10 @@ use std::hash::{Hash, Hasher};
 use std::io::Read;
 
 use byteorder::{LittleEndian, ReadBytesExt};
-use chrono::{DateTime, Utc};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use uuid::Uuid;
+
+pub use chrono::{DateTime, Utc};
+pub use uuid::Uuid;
 
 #[cfg(feature = "serialize")]
 use {
