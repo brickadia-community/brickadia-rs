@@ -5,6 +5,7 @@ use std::{
 
 use bitstream_io::BitRead;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, ReadBytesExt};
+use chrono::{prelude::*, Duration};
 use uuid::Uuid;
 
 use crate::save::{Color, UnrealType};
@@ -48,6 +49,12 @@ pub trait ReadExt: Read {
         let mut bytes = [0u8; 16];
         BigEndian::write_u32_into(&le_bytes, &mut bytes);
         Ok(Uuid::from_bytes(bytes))
+    }
+
+    fn read_datetime(&mut self) -> Result<DateTime<Utc>> {
+        let ticks = self.read_i64::<LittleEndian>()?;
+        let epoch = Utc.with_ymd_and_hms(1, 1, 1, 0, 0, 0).unwrap();
+        Ok(epoch + Duration::microseconds(ticks / 10) + Duration::nanoseconds((ticks % 10) * 100))
     }
 
     fn read_array<F, T>(&mut self, mut operation: F) -> Result<Vec<T>>

@@ -9,6 +9,7 @@ use std::{
 
 use bitstream_io::{BitRead, BitReader};
 use byteorder::{LittleEndian, ReadBytesExt};
+use chrono::{Duration, LocalResult, TimeZone, Utc};
 use flate2::read::ZlibDecoder;
 use thiserror::Error;
 
@@ -112,9 +113,7 @@ impl<R: Read> SaveReader<R> {
         //         else: not provided
         let save_time = match self.version {
             _ if self.version >= 4 => {
-                let mut bytes = [0u8; 8]; // todo: figure out how to parse this
-                cursor.read_exact(&mut bytes)?;
-                Some(bytes)
+                cursor.read_datetime().ok()
             }
             _ => None,
         };
@@ -134,7 +133,7 @@ impl<R: Read> SaveReader<R> {
             },
             description,
             host,
-            save_time: save_time.unwrap_or([0u8; 8]),
+            save_time,
             brick_count,
         })
     }
