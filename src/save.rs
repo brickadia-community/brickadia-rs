@@ -6,7 +6,9 @@ use std::io::Read;
 
 use byteorder::{LittleEndian, ReadBytesExt};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
-use uuid::Uuid;
+
+pub use chrono::{DateTime, Utc};
+pub use uuid::Uuid;
 
 #[cfg(feature = "serialize")]
 use {
@@ -96,8 +98,7 @@ pub struct Header1 {
     pub host: Option<User>,
 
     /// The save time of the save.
-    #[cfg_attr(feature = "serialize", serde(skip))]
-    pub save_time: [u8; 8],
+    pub save_time: Option<DateTime<Utc>>,
 
     /// The number of bricks in the save.
     pub brick_count: u32,
@@ -110,7 +111,7 @@ impl Default for Header1 {
             description: String::new(),
             author: User::default(),
             host: None,
-            save_time: [0u8; 8],
+            save_time: None,
             brick_count: 0,
         }
     }

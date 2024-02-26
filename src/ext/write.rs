@@ -2,6 +2,7 @@ use std::io::{self, Write};
 
 use bitstream_io::BitWrite;
 use byteorder::{BigEndian, ByteOrder, LittleEndian, WriteBytesExt};
+use chrono::prelude::*;
 use uuid::Uuid;
 
 use crate::save::{Color, UnrealType};
@@ -38,6 +39,19 @@ pub trait WriteExt: Write {
             self.write_u32::<LittleEndian>(e)?;
         }
 
+        Ok(())
+    }
+
+    fn write_datetime(&mut self, datetime: Option<DateTime<Utc>>) -> io::Result<()> {
+        let datetime = match datetime {
+            Some(datetime) => datetime,
+            None => Utc::now(),
+        };
+        let epoch = Utc.with_ymd_and_hms(1, 1, 1, 0, 0, 0).unwrap();
+        let duration = datetime - epoch;
+        let ticks_secs = i64::try_from(duration.num_seconds() * 10_000_000).unwrap();
+        let ticks_nanos = i64::from(duration.subsec_nanos() / 100);
+        self.write_i64::<LittleEndian>(ticks_secs + ticks_nanos)?;
         Ok(())
     }
 

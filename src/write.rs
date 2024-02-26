@@ -88,7 +88,7 @@ impl<W: Write> SaveWriter<W> {
             w.write_string(host.name)?;
             w.write_uuid(host.id)?;
 
-            w.write_all(&self.data.header1.save_time)?;
+            w.write_datetime(self.data.header1.save_time)?;
             w.write_i32::<LittleEndian>(self.data.bricks.len() as i32)?;
 
             write_compressed(&mut self.writer, w, self.compressed)?;
