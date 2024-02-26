@@ -9,7 +9,6 @@ use std::{
 
 use bitstream_io::{BitRead, BitReader};
 use byteorder::{LittleEndian, ReadBytesExt};
-use chrono::{Duration, LocalResult, TimeZone, Utc};
 use flate2::read::ZlibDecoder;
 use thiserror::Error;
 
