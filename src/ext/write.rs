@@ -163,6 +163,12 @@ pub trait BitWriteExt: BitWrite {
         self.write_bytes(&bytes)
     }
 
+    fn write_f64(&mut self, value: f64) -> io::Result<()> {
+        let mut bytes = [0u8; 8];
+        LittleEndian::write_f64(&mut bytes, value);
+        self.write_bytes(&bytes)
+    }
+
     fn write_array<F: FnMut(&mut Self, &T) -> io::Result<()>, T>(
         &mut self,
         vec: &[T],
@@ -186,6 +192,8 @@ pub trait BitWriteExt: BitWrite {
             UnrealType::String(str) => self.write_string(str)?,
             UnrealType::Color(color) => self.write_bytes(&[color.b, color.g, color.r, color.a])?,
             UnrealType::Float(float) => self.write_f32(float)?,
+            UnrealType::Integer(int) => self.write_i32(int)?,
+            UnrealType::Double(double) => self.write_f64(double)?,
             UnrealType::Rotator(x, y, z) => {
                 self.write_f32(x)?;
                 self.write_f32(y)?;

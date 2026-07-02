@@ -183,6 +183,10 @@ impl<R: Read> SaveReader<R> {
                     _ if self.version >= 8 => {
                         let id = r.read_uuid()?;
                         let name = r.read_string()?;
+                        // version >= 13: a second string, the owner's display name.
+                        if self.version >= 13 {
+                            let _display_name = r.read_string()?;
+                        }
                         let bricks = r.read_i32::<LittleEndian>()? as u32;
                         Ok(BrickOwner { name, id, bricks })
                     }

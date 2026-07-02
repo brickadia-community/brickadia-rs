@@ -189,12 +189,20 @@ pub trait BitReadExt: BitRead {
         Ok(LittleEndian::read_f32(&bytes))
     }
 
+    fn read_f64_le(&mut self) -> Result<f64> {
+        let mut bytes = [0u8; 8];
+        self.read_bytes(&mut bytes)?;
+        Ok(LittleEndian::read_f64(&bytes))
+    }
+
     fn read_unreal_type(&mut self, t: &str) -> Result<UnrealType> {
         match t {
             "Class" | "Object" => Ok(UnrealType::Class(self.read_string()?)),
             "String" => Ok(UnrealType::String(self.read_string()?)),
             "Boolean" => Ok(UnrealType::Boolean(self.read_i32_le()? != 0)),
             "Float" => Ok(UnrealType::Float(self.read_f32_le()?)),
+            "Integer" => Ok(UnrealType::Integer(self.read_i32_le()?)),
+            "Double" => Ok(UnrealType::Double(self.read_f64_le()?)),
             "Color" => {
                 let mut bytes = [0u8; 4];
                 self.read_bytes(&mut bytes)?;

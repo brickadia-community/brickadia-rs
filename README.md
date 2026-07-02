@@ -2,7 +2,7 @@
 
 A Brickadia save file (.brs) reader/writer library for Rust.
 
-Supports save versions <= 10.
+Supports save versions <= 13.
 
 ### Features
 

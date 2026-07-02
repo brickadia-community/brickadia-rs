@@ -235,6 +235,8 @@ pub enum UnrealType {
     Color(Color),
     Byte(u8),
     Rotator(f32, f32, f32),
+    Integer(i32),
+    Double(f64),
 }
 
 /// A user.
