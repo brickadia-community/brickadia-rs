@@ -18,6 +18,13 @@ lazy_static::lazy_static! {
     static ref DEFAULT_MATERIALS: Vec<String> = vec!["BMC_Hologram", "BMC_Plastic", "BMC_Glow", "BMC_Metallic", "BMC_Glass"].into_iter().map(|s| s.into()).collect();
 }
 
+/// Upper bound on lengths read straight from the file before allocating --
+/// a corrupt/truncated length prefix must fail to parse instead of reaching
+/// the allocator, where even a merely large (not just negative) `i32` can
+/// overflow wasm32's 32-bit `isize` and panic the whole module.
+const MAX_COMPRESSED_SECTION_LEN: usize = 1_000_000_000;
+const MAX_COMPONENT_DATA_LEN: usize = 100_000_000;
+
 /// A read error.
 #[derive(Error, Debug)]
 pub enum ReadError {
@@ -392,7 +399,13 @@ impl<R: Read> SaveReader<R> {
             for _ in 0..len {
                 let name = cursor.read_string()?;
 
-                let mut bit_bytes = vec![0u8; cursor.read_i32::<LittleEndian>()? as usize];
+                let bit_bytes_len = cursor.read_i32::<LittleEndian>()?;
+                if bit_bytes_len < 0 || bit_bytes_len as usize > MAX_COMPONENT_DATA_LEN {
+                    return Err(
+                        io::Error::new(io::ErrorKind::InvalidData, "invalid component data length").into(),
+                    );
+                }
+                let mut bit_bytes = vec![0u8; bit_bytes_len as usize];
                 cursor.read_exact(&mut bit_bytes)?;
                 let mut bits =
                     BitReader::endian(Cursor::new(bit_bytes), bitstream_io::LittleEndian);
@@ -471,7 +484,11 @@ fn read_compressed(reader: &mut impl Read) -> Result<(Cursor<Vec<u8>>, i32), Rea
         reader.read_i32::<LittleEndian>()?,
         reader.read_i32::<LittleEndian>()?,
     );
-    if uncompressed_size < 0 || compressed_size < 0 || compressed_size > uncompressed_size {
+    if uncompressed_size < 0
+        || compressed_size < 0
+        || compressed_size > uncompressed_size
+        || uncompressed_size as usize > MAX_COMPRESSED_SECTION_LEN
+    {
         return Err(ReadError::InvalidCompression);
     }
 
@@ -496,7 +513,11 @@ fn skip_compressed(reader: &mut impl Read) -> Result<(), ReadError> {
         reader.read_i32::<LittleEndian>()?,
         reader.read_i32::<LittleEndian>()?,
     );
-    if uncompressed_size < 0 || compressed_size < 0 || compressed_size > uncompressed_size {
+    if uncompressed_size < 0
+        || compressed_size < 0
+        || compressed_size > uncompressed_size
+        || uncompressed_size as usize > MAX_COMPRESSED_SECTION_LEN
+    {
         return Err(ReadError::InvalidCompression);
     }
 
@@ -510,4 +531,20 @@ fn skip_compressed(reader: &mut impl Read) -> Result<(), ReadError> {
     )?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A corrupt compressed-section header can claim an uncompressed size
+    /// right at (or past) wasm32's ~2GB `isize` ceiling; `read_compressed`
+    /// must reject it before allocating rather than panic.
+    #[test]
+    fn read_compressed_rejects_oversized_uncompressed_size() {
+        let mut bytes = Vec::new();
+        bytes.extend_from_slice(&i32::MAX.to_le_bytes()); // uncompressed_size
+        bytes.extend_from_slice(&0i32.to_le_bytes()); // compressed_size
+        assert!(read_compressed(&mut Cursor::new(bytes)).is_err());
+    }
 }

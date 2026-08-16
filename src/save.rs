@@ -174,7 +174,19 @@ impl Preview {
     /// Create a `Preview` from a reader.
     pub fn from_reader(r: &mut impl Read) -> Result<Self, ReadError> {
         fn read_bytes(r: &mut impl Read) -> Result<Vec<u8>, ReadError> {
+            // A corrupt/truncated length prefix here must fail to parse
+            // instead of reaching the allocator, where even a merely large
+            // (not just negative) `i32` can overflow wasm32's 32-bit
+            // `isize` and panic the whole module.
+            const MAX_PREVIEW_LEN: usize = 50_000_000;
             let len = r.read_i32::<LittleEndian>()?;
+            if len < 0 || len as usize > MAX_PREVIEW_LEN {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "invalid preview data length",
+                )
+                .into());
+            }
             let mut vec = vec![0u8; len as usize];
             r.read_exact(&mut vec)?;
             Ok(vec)
@@ -637,5 +649,27 @@ impl Default for Component {
             brick_indices: vec![],
             properties: HashMap::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A corrupt preview length prefix must fail to parse instead of
+    /// reaching the allocator, where even a merely large (not just
+    /// negative) `i32` can overflow wasm32's 32-bit `isize` and panic.
+    #[test]
+    fn preview_rejects_oversized_length() {
+        let mut bytes = vec![1u8]; // mode: PNG
+        bytes.extend_from_slice(&i32::MAX.to_le_bytes());
+        assert!(Preview::from_reader(&mut bytes.as_slice()).is_err());
+    }
+
+    #[test]
+    fn preview_rejects_negative_length() {
+        let mut bytes = vec![1u8]; // mode: PNG
+        bytes.extend_from_slice(&(-1i32).to_le_bytes());
+        assert!(Preview::from_reader(&mut bytes.as_slice()).is_err());
     }
 }

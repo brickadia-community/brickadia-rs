@@ -10,11 +10,27 @@ use uuid::Uuid;
 
 use crate::save::{Color, UnrealType};
 
+/// Upper bound on a single string field's length and on an array's
+/// allocation hint. No legitimate save field (mod/brick/material/owner
+/// names, descriptions, tags, ...) approaches this; it exists purely to
+/// keep a corrupt or truncated length prefix from reaching the allocator,
+/// where -- on wasm32's 32-bit `isize`, even a merely large (not just
+/// negative) length can overflow capacity math and panic the whole module.
+const MAX_STRING_LEN: usize = 10_000_000;
+
+fn too_long_string_error() -> io::Error {
+    io::Error::new(io::ErrorKind::InvalidData, "string field too long")
+}
+
 pub trait ReadExt: Read {
     fn read_string(&mut self) -> Result<String> {
         match self.read_i32::<LittleEndian>()? {
             size if size >= 0 => {
-                let mut chars = vec![0u8; cmp::max(0, size - 1) as usize];
+                let len = cmp::max(0, size - 1) as usize;
+                if len > MAX_STRING_LEN {
+                    return Err(too_long_string_error());
+                }
+                let mut chars = vec![0u8; len];
                 self.read_exact(&mut chars)?;
                 if size > 0 {
                     self.read_u8()?;
@@ -26,7 +42,11 @@ pub trait ReadExt: Read {
                 let size = -size;
                 match size % 2 {
                     0 => {
-                        let mut chars = vec![0; size as usize / 2];
+                        let len = size as usize / 2;
+                        if len > MAX_STRING_LEN {
+                            return Err(too_long_string_error());
+                        }
+                        let mut chars = vec![0; len];
                         self.read_u16_into::<LittleEndian>(&mut chars)?;
                         String::from_utf16(&chars).map_err(|_| {
                             io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 string data")
@@ -69,7 +89,7 @@ pub trait ReadExt: Read {
         // allocation hint (not the read itself, which still errors out
         // normally once `operation` runs past the actual data) so a bad
         // length can't blow the allocator instead of just failing to parse.
-        let mut vec = Vec::with_capacity(cmp::min(len as usize, 10_000_000));
+        let mut vec = Vec::with_capacity(cmp::min(len as usize, MAX_STRING_LEN));
         for _ in 0..len {
             vec.push(operation(self)?);
         }
@@ -88,7 +108,7 @@ pub trait BitReadExt: BitRead {
         if len < 0 {
             return Err(io::Error::new(io::ErrorKind::InvalidData, "negative array length"));
         }
-        let mut vec = Vec::with_capacity(cmp::min(len as usize, 10_000_000));
+        let mut vec = Vec::with_capacity(cmp::min(len as usize, MAX_STRING_LEN));
         for _ in 0..len {
             vec.push(operation(self)?);
         }
@@ -135,7 +155,11 @@ pub trait BitReadExt: BitRead {
     fn read_string(&mut self) -> Result<String> {
         match self.read_i32_le()? {
             size if size >= 0 => {
-                let mut chars = vec![0u8; cmp::max(0, size - 1) as usize];
+                let len = cmp::max(0, size - 1) as usize;
+                if len > MAX_STRING_LEN {
+                    return Err(too_long_string_error());
+                }
+                let mut chars = vec![0u8; len];
                 self.read_bytes(&mut chars)?;
                 if size > 0 {
                     self.read_bytes(&mut [0])?;
@@ -147,7 +171,11 @@ pub trait BitReadExt: BitRead {
                 let size = -size * 2;
                 match size % 2 {
                     0 => {
-                        let mut chars = vec![0; (size / 2) as usize];
+                        let len = (size / 2) as usize;
+                        if len > MAX_STRING_LEN {
+                            return Err(too_long_string_error());
+                        }
+                        let mut chars = vec![0; len];
                         self.read_u16_le_into(&mut chars)?;
                         String::from_utf16(&chars).map_err(|_| {
                             io::Error::new(io::ErrorKind::InvalidData, "invalid UCS-2 string data")
@@ -266,5 +294,22 @@ mod tests {
         let mut reader = BitReader::<_, bitstream_io::LittleEndian>::new(Cursor::new(bytes));
         let result: Result<Vec<u8>> = reader.read_array(|r| Ok(r.read_uint(2)? as u8));
         assert!(result.is_err());
+    }
+
+    /// On wasm32's 32-bit `isize`, even a merely large -- not negative --
+    /// `i32` length can overflow capacity math and panic. A corrupt length
+    /// prefix must fail to parse instead of reaching the allocator at all.
+    #[test]
+    fn read_string_rejects_oversized_length() {
+        let bytes = i32::MAX.to_le_bytes();
+        let mut cursor = Cursor::new(bytes);
+        assert!(cursor.read_string().is_err());
+    }
+
+    #[test]
+    fn bitread_string_rejects_oversized_length() {
+        let bytes = i32::MAX.to_le_bytes();
+        let mut reader = BitReader::<_, bitstream_io::LittleEndian>::new(Cursor::new(bytes));
+        assert!(BitReadExt::read_string(&mut reader).is_err());
     }
 }
