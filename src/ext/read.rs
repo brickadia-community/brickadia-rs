@@ -62,7 +62,14 @@ pub trait ReadExt: Read {
         F: FnMut(&mut Self) -> Result<T>,
     {
         let len = self.read_i32::<LittleEndian>()?;
-        let mut vec = Vec::with_capacity(len as usize);
+        if len < 0 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "negative array length"));
+        }
+        // Corrupt/truncated files can claim an absurd count here; cap the
+        // allocation hint (not the read itself, which still errors out
+        // normally once `operation` runs past the actual data) so a bad
+        // length can't blow the allocator instead of just failing to parse.
+        let mut vec = Vec::with_capacity(cmp::min(len as usize, 10_000_000));
         for _ in 0..len {
             vec.push(operation(self)?);
         }
@@ -78,7 +85,10 @@ pub trait BitReadExt: BitRead {
         F: FnMut(&mut Self) -> Result<T>,
     {
         let len = self.read_i32_le()?;
-        let mut vec = Vec::with_capacity(len as usize);
+        if len < 0 {
+            return Err(io::Error::new(io::ErrorKind::InvalidData, "negative array length"));
+        }
+        let mut vec = Vec::with_capacity(cmp::min(len as usize, 10_000_000));
         for _ in 0..len {
             vec.push(operation(self)?);
         }
@@ -227,3 +237,34 @@ pub trait BitReadExt: BitRead {
 }
 
 impl<R> BitReadExt for R where R: BitRead {}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Cursor;
+
+    use bitstream_io::BitReader;
+
+    use super::*;
+
+    /// A corrupt/truncated file can put a negative (or otherwise bogus)
+    /// count where an array length is expected. `Vec::with_capacity` on the
+    /// naive `len as usize` cast of a negative i32 wraps to a huge value and
+    /// panics with "capacity overflow" instead of failing to parse -- this
+    /// is what crashed real-world uploads. `read_array` must report a clean
+    /// error instead.
+    #[test]
+    fn read_array_rejects_negative_length() {
+        let bytes = (-1i32).to_le_bytes();
+        let mut cursor = Cursor::new(bytes);
+        let result: Result<Vec<u8>> = cursor.read_array(|r| r.read_u8());
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn bitread_array_rejects_negative_length() {
+        let bytes = (-1i32).to_le_bytes();
+        let mut reader = BitReader::<_, bitstream_io::LittleEndian>::new(Cursor::new(bytes));
+        let result: Result<Vec<u8>> = reader.read_array(|r| Ok(r.read_uint(2)? as u8));
+        assert!(result.is_err());
+    }
+}
